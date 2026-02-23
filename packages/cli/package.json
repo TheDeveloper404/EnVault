@@ -1,0 +1,28 @@
+{
+  "name": "@envault/cli",
+  "version": "1.0.0",
+  "description": "EnVault CLI - Command line interface for managing environment variables",
+  "main": "./dist/index.js",
+  "type": "module",
+  "bin": {
+    "envault": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@envault/core": "workspace:*",
+    "commander": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.1.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}

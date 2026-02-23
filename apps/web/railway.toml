@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd apps/web && pnpm install && pnpm build"
+
+[deploy]
+startCommand = "cd apps/web && pnpm preview --port $PORT"
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
