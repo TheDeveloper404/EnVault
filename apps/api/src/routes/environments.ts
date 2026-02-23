@@ -19,14 +19,21 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
       where: { projectId },
       orderBy: { createdAt: 'asc' },
       include: {
-        _count: { select: { variables: true } }
+        variables: { orderBy: { key: 'asc' } }
       }
     });
 
-    return environments.map((e: { id: string; name: string; _count: { variables: number }; createdAt: Date }) => ({
+    return environments.map((e: { id: string; name: string; variables: Array<{id: string; key: string; value: string; isSecret: boolean; createdAt: Date; updatedAt: Date}>; createdAt: Date }) => ({
       id: e.id,
       name: e.name,
-      variableCount: e._count.variables,
+      variables: e.variables.map(v => ({
+        id: v.id,
+        key: v.key,
+        value: decryptValue(v.value),
+        isSecret: v.isSecret,
+        createdAt: v.createdAt.toISOString(),
+        updatedAt: v.updatedAt.toISOString()
+      })),
       createdAt: e.createdAt.toISOString()
     }));
   });
@@ -253,5 +260,30 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
 
     reply.header('Content-Type', 'text/plain');
     return content;
+  });
+
+  // DELETE /projects/:id/environments/:envName - Delete environment
+  fastify.delete('/:envName', async (request, reply) => {
+    const { id: projectId, envName } = request.params as { id: string; envName: string };
+
+    const environment = await prisma.environment.findUnique({
+      where: { projectId_name: { projectId, name: envName } }
+    });
+
+    if (!environment) {
+      return reply.status(404).send({ error: 'Environment not found' });
+    }
+
+    await prisma.envVariable.deleteMany({
+      where: { environmentId: environment.id }
+    });
+
+    await prisma.environment.delete({
+      where: { id: environment.id }
+    });
+
+    await logAudit('DELETE', 'ENVIRONMENT', environment.id, projectId, { name: envName });
+
+    return reply.status(200).send({ deleted: true });
   });
 }
