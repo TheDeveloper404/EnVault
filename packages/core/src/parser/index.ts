@@ -74,7 +74,7 @@ export function parseEnv(content: string, options: ParseOptions = {}): ParseResu
       key,
       value: parsedValue,
       comment: currentComment || undefined,
-      originalLine: originalLine.trimEnd()
+      originalLine: originalLine.trim()
     };
 
     entries.push(entry);
@@ -195,9 +195,9 @@ export function isSecretKey(key: string): boolean {
 /**
  * Create a masked version of a value
  */
-export function maskValue(value: string, visibleChars: number = 4): string {
+export function maskValue(value: string, visibleChars: number = 2): string {
   if (value.length <= visibleChars * 2) {
     return '*'.repeat(value.length);
   }
-  return value.substring(0, visibleChars) + '*'.repeat(value.length - visibleChars * 2) + value.substring(value.length - visibleChars);
+  return value.substring(0, visibleChars) + '•'.repeat(value.length - visibleChars * 2) + value.substring(value.length - visibleChars);
 }

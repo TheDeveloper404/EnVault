@@ -53,7 +53,7 @@ export function parseEnvExample(content: string): EnvSchema {
       const value = trimmed.substring(equalIndex + 1).trim();
       fields[key] = {
         required: false,
-        default: value || undefined
+        default: value !== undefined ? value : undefined
       };
     }
   }

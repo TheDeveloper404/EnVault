@@ -136,11 +136,11 @@ describe('parser', () => {
     });
 
     it('masks long values showing first/last chars', () => {
-      expect(maskValue('supersecret')).toBe('su••••••et');
+      expect(maskValue('supersecret')).toBe('su' + '•'.repeat(7) + 'et');
     });
 
     it('respects visibleChars parameter', () => {
-      expect(maskValue('supersecret', 2)).toBe('su••••••••et');
+      expect(maskValue('supersecret', 3)).toBe('sup' + '•'.repeat(5) + 'ret');
     });
   });
 });

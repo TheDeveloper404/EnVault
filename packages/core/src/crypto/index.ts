@@ -57,27 +57,41 @@ export function validateMasterKey(masterKey: string): { valid: boolean; error?: 
 }
 
 /**
+ * Check if master key is a direct key (hex or base64) vs a passphrase
+ */
+function isDirectKey(masterKey: string): boolean {
+  if (/^[a-f0-9]{64}$/i.test(masterKey)) return true;
+  try {
+    const decoded = Buffer.from(masterKey, 'base64');
+    if (decoded.length === KEY_LENGTH) return true;
+  } catch {
+    // not base64
+  }
+  return false;
+}
+
+/**
  * Get raw key buffer from master key
  */
-export function getKeyBuffer(masterKey: string, salt?: Buffer): Buffer {
+export function getKeyBuffer(masterKey: string, salt?: Buffer): { key: Buffer; salt?: Buffer } {
   // Try hex first
   if (/^[a-f0-9]{64}$/i.test(masterKey)) {
-    return Buffer.from(masterKey, 'hex');
+    return { key: Buffer.from(masterKey, 'hex') };
   }
 
   // Try base64
   try {
     const decoded = Buffer.from(masterKey, 'base64');
     if (decoded.length === KEY_LENGTH) {
-      return decoded;
+      return { key: decoded };
     }
   } catch {
     // Fall through to derivation
   }
 
   // Derive using scrypt
-  const { key } = deriveKey(masterKey, salt);
-  return key;
+  const { key, salt: usedSalt } = deriveKey(masterKey, salt);
+  return { key, salt: usedSalt };
 }
 
 /**
@@ -86,14 +100,16 @@ export function getKeyBuffer(masterKey: string, salt?: Buffer): Buffer {
  */
 export function encrypt(plaintext: string, masterKey: string): string {
   const nonce = randomBytes(NONCE_LENGTH);
-  const key = getKeyBuffer(masterKey);
+  const { key, salt } = getKeyBuffer(masterKey);
 
   const cipher = createCipheriv(ALGORITHM, key, nonce);
   const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
 
-  // Combine: nonce(12) + tag(16) + ciphertext
-  const combined = Buffer.concat([nonce, tag, ciphertext]);
+  // If passphrase-derived, prepend salt: salt(16) + nonce(12) + tag(16) + ciphertext
+  // Otherwise: nonce(12) + tag(16) + ciphertext
+  const parts = salt ? [salt, nonce, tag, ciphertext] : [nonce, tag, ciphertext];
+  const combined = Buffer.concat(parts);
   return combined.toString('base64');
 }
 
@@ -108,11 +124,23 @@ export function decrypt(encrypted: string, masterKey: string): string {
     throw new DecryptionError('Invalid encrypted data: too short');
   }
 
-  const nonce = combined.subarray(0, NONCE_LENGTH);
-  const tag = combined.subarray(NONCE_LENGTH, NONCE_LENGTH + TAG_LENGTH);
-  const ciphertext = combined.subarray(NONCE_LENGTH + TAG_LENGTH);
+  let offset = 0;
+  let salt: Buffer | undefined;
 
-  const key = getKeyBuffer(masterKey);
+  // If passphrase, first 16 bytes are salt
+  if (!isDirectKey(masterKey)) {
+    if (combined.length < SALT_LENGTH + NONCE_LENGTH + TAG_LENGTH) {
+      throw new DecryptionError('Invalid encrypted data: too short for passphrase mode');
+    }
+    salt = combined.subarray(0, SALT_LENGTH);
+    offset = SALT_LENGTH;
+  }
+
+  const nonce = combined.subarray(offset, offset + NONCE_LENGTH);
+  const tag = combined.subarray(offset + NONCE_LENGTH, offset + NONCE_LENGTH + TAG_LENGTH);
+  const ciphertext = combined.subarray(offset + NONCE_LENGTH + TAG_LENGTH);
+
+  const { key } = getKeyBuffer(masterKey, salt);
 
   const decipher = createDecipheriv(ALGORITHM, key, nonce);
   decipher.setAuthTag(tag);

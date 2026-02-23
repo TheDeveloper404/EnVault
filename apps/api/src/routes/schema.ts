@@ -6,8 +6,8 @@ import { decryptValue } from '../crypto.js';
 import { parseEnvExample, parseSchemaJson, validateEnv, diffEnvs, maskValue, isSecretKey } from '@envault/core';
 
 export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
-  // POST /projects/:id/schema - Set schema
-  fastify.post('/', async (request, reply) => {
+  // POST /schema - Set schema
+  fastify.post('/schema', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
     const { content } = setSchemaSchema.parse(request.body);
 
@@ -54,8 +54,8 @@ export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
     });
   });
 
-  // GET /projects/:id/schema - Get schema
-  fastify.get('/', async (request, reply) => {
+  // GET /schema - Get schema
+  fastify.get('/schema', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
 
     const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -76,7 +76,7 @@ export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
     };
   });
 
-  // POST /projects/:id/validate - Validate environment against schema
+  // POST /validate - Validate environment against schema
   fastify.post('/validate', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
     const { env: envName } = validateQuerySchema.parse(request.query);
@@ -120,7 +120,7 @@ export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
     };
   });
 
-  // GET /projects/:id/diff - Compare environments
+  // GET /diff - Compare environments
   fastify.get('/diff', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
     const { from, to } = diffQuerySchema.parse(request.query);
@@ -170,7 +170,7 @@ export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
     };
   });
 
-  // GET /projects/:id/audit - Get audit logs
+  // GET /audit - Get audit logs
   fastify.get('/audit', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
 
