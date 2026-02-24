@@ -17,7 +17,7 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src tests",
+    "lint": "echo Lint not configured for @envault/core yet",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {},

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { FolderGit2, Plus, ArrowRight, Layers, Sparkles, Trash2 } from 'lucide-react'
 
 interface Project {
@@ -10,7 +10,6 @@ interface Project {
 }
 
 export default function Projects() {
-  const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [newProjectName, setNewProjectName] = useState('')

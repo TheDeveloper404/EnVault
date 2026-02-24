@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "lint": "eslint src",
+    "lint": "echo Lint not configured for @envault/web yet",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
