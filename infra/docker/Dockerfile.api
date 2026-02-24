@@ -1,15 +1,15 @@
 # Build stage for API
-FROM node:20-alpine AS api-builder
+FROM node:20-alpine AS envault_api_builder
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@8 --activate
 
 # Copy workspace files
-COPY pnpm-workspace.yaml package.json ./
+COPY pnpm-workspace.yaml package.json tsconfig.json ./
 COPY packages/core ./packages/core
 COPY apps/api ./apps/api
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Build core and api
 RUN pnpm --filter @envault/core build
@@ -17,24 +17,25 @@ RUN pnpm --filter @envault/api build
 RUN pnpm --filter @envault/api db:generate
 
 # Production stage
-FROM node:20-alpine AS api
+FROM node:20-alpine AS envault_api_runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Install sqlite tools
-RUN apk add --no-cache sqlite
+# Install runtime tools required by Prisma and SQLite
+RUN apk add --no-cache sqlite openssl
 
 # Copy built artifacts
-COPY --from=api-builder /app/packages/core/dist ./packages/core/dist
-COPY --from=api-builder /app/apps/api/dist ./apps/api/dist
-COPY --from=api-builder /app/apps/api/prisma ./apps/api/prisma
-COPY --from=api-builder /app/node_modules ./node_modules
-COPY --from=api-builder /app/packages/core/node_modules ./packages/core/node_modules
-COPY --from=api-builder /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=api-builder /app/apps/api/package.json ./apps/api/package.json
+COPY --from=envault_api_builder /app/packages/core/dist ./packages/core/dist
+COPY --from=envault_api_builder /app/packages/core/package.json ./packages/core/package.json
+COPY --from=envault_api_builder /app/apps/api/dist ./apps/api/dist
+COPY --from=envault_api_builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=envault_api_builder /app/node_modules ./node_modules
+COPY --from=envault_api_builder /app/packages/core/node_modules ./packages/core/node_modules
+COPY --from=envault_api_builder /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=envault_api_builder /app/apps/api/package.json ./apps/api/package.json
 
 WORKDIR /app/apps/api
 
-EXPOSE 7777
+EXPOSE 4000
 
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

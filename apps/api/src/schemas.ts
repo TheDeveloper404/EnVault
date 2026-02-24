@@ -33,9 +33,18 @@ export const diffQuerySchema = z.object({
   to: z.string()
 });
 
+const booleanQuery = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0') return false;
+  }
+  return value;
+}, z.boolean());
+
 export const exportQuerySchema = z.object({
-  includeEmpty: z.boolean().optional().default(true),
-  mask: z.boolean().optional().default(true)
+  includeEmpty: booleanQuery.optional().default(true),
+  mask: booleanQuery.optional().default(true)
 });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;

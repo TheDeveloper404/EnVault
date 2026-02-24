@@ -35,6 +35,7 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
+tests/
 
 # Prisma
 prisma/migrations/*/migration_lock.toml
@@ -44,3 +45,7 @@ prisma/migrations/*/migration_lock.toml
 .cache/
 temp/
 tmp/
+
+# Local docs (temporary)
+docs/
+

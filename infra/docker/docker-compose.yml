@@ -1,36 +1,50 @@
 version: '3.8'
 
+name: envault
+
 services:
-  api:
+  envault-api:
+    image: envault-api:latest
+    container_name: envault-api
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.api
     environment:
       - DATABASE_URL=file:/data/envault.db
-      - ENVAULT_MASTER_KEY=${ENVAULT_MASTER_KEY}
+      - ENVAULT_MASTER_KEY=${ENVAULT_MASTER_KEY:-aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344}
       - NODE_ENV=production
-      - PORT=7777
+      - PORT=4000
     volumes:
-      - envault-data:/data
+      - envault-api-data:/data
     ports:
-      - "7777:7777"
+      - "4000:4000"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7777/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    networks:
+      - envault-network
 
-  web:
+  envault-web:
+    image: envault-web:latest
+    container_name: envault-web
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.web
     ports:
-      - "3000:80"
+      - "4001:80"
     depends_on:
-      - api
+      - envault-api
     restart: unless-stopped
+    networks:
+      - envault-network
 
 volumes:
-  envault-data:
+  envault-api-data:
     driver: local
+
+networks:
+  envault-network:
+    name: envault-network
