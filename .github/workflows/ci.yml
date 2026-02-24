@@ -20,6 +20,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install
       - run: pnpm lint
+      - run: pnpm --filter @envault/core build
       - run: pnpm typecheck
 
   test-core:
