@@ -206,6 +206,25 @@ pnpm --filter @envault/api test:integration
 pnpm --filter @envault/web test:e2e
 ```
 
+## Release Workflow (main -> production)
+
+Use this sequence when preparing a production release:
+
+```bash
+# 1) Push to main
+git push origin main
+
+# 2) Build all workspaces
+pnpm build
+
+# 3) Run tests
+pnpm test
+```
+
+CI (`.github/workflows/ci.yml`) runs lint + typecheck + tests, and the lint/typecheck job builds `@envault/core` before workspace typecheck so `@envault/cli` can resolve `@envault/core` types reliably in clean runners.
+
+Production deploy is done from the main branch using Railway configuration in `railway.toml`.
+
 ## Environment Variables
 
 | Variable | Required | Description |
