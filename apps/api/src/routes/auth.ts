@@ -101,6 +101,114 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/me', { preHandler: [authenticate] }, async (request) => {
     return { user: request.user };
   });
+
+  // GitHub OAuth
+  const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+  const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+  const APP_URL = process.env.APP_URL || 'http://localhost:3093';
+
+  // GET /auth/github - Redirect to GitHub
+  fastify.get('/github', async (request, reply) => {
+    if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
+      return reply.status(501).send({ error: 'GitHub OAuth not configured' });
+    }
+    
+    const scope = 'read:user user:email';
+    const redirectUri = `${APP_URL}/auth/github/callback`;
+    const state = Math.random().toString(36).substring(7);
+    
+    reply.redirect(
+      `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}`
+    );
+  });
+
+  // GET /auth/github/callback - Handle GitHub callback
+  fastify.get('/github/callback', async (request, reply) => {
+    const { code, state } = request.query as { code?: string; state?: string };
+    
+    if (!code) {
+      return reply.redirect(`${APP_URL}/login?error=github_auth_failed`);
+    }
+
+    if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
+      return reply.redirect(`${APP_URL}/login?error=github_not_configured`);
+    }
+
+    try {
+      // Exchange code for access token
+      const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: GITHUB_CLIENT_ID,
+          client_secret: GITHUB_CLIENT_SECRET,
+          code
+        })
+      });
+
+      const tokenData = await tokenRes.json() as { access_token?: string; error?: string };
+      
+      if (!tokenData.access_token) {
+        return reply.redirect(`${APP_URL}/login?error=github_token_failed`);
+      }
+
+      // Get user info
+      const userRes = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          Accept: 'application/json'
+        }
+      });
+
+      const githubUser = await userRes.json() as { id: number; email?: string; login: string; name?: string };
+      
+      // Get user email if not public
+      let email = githubUser.email;
+      if (!email) {
+        const emailsRes = await fetch('https://api.github.com/user/emails', {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+            Accept: 'application/json'
+          }
+        });
+        const emails = await emailsRes.json() as Array<{ email: string; primary: boolean }>;
+        const primaryEmail = emails.find((e: { primary: boolean }) => e.primary);
+        email = primaryEmail?.email || emails[0]?.email;
+      }
+
+      if (!email) {
+        return reply.redirect(`${APP_URL}/login?error=github_no_email`);
+      }
+
+      // Find or create user
+      let user = await prisma.user.findUnique({ where: { email } });
+      
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email,
+            passwordHash: await bcrypt.hash(Math.random().toString(36), 10),
+            name: githubUser.name || githubUser.login
+          }
+        });
+      }
+
+      // Generate JWT
+      const token = jwt.sign(
+        { id: user.id, email: user.email },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      reply.redirect(`${APP_URL}/?token=${token}`);
+    } catch (error) {
+      console.error('GitHub OAuth error:', error);
+      return reply.redirect(`${APP_URL}/login?error=github_auth_error`);
+    }
+  });
 }
 
 export async function authenticate(request: FastifyRequest, reply: FastifyReply) {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, Mail, Lock, User, AlertCircle } from 'lucide-react';
+import { Shield, Mail, Lock, User, AlertCircle, Github } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Signup() {
@@ -137,6 +137,25 @@ export default function Signup() {
               Sign in
             </Link>
           </p>
+
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-700"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-slate-800/50 text-slate-400">Or continue with</span>
+              </div>
+            </div>
+
+            <a
+              href="/api/auth/github"
+              className="mt-4 w-full py-3 px-4 bg-slate-800 border border-slate-700 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"
+            >
+              <Github className="w-5 h-5" />
+              Sign up with GitHub
+            </a>
+          </div>
         </div>
       </div>
     </div>

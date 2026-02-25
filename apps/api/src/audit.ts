@@ -1,6 +1,6 @@
 import { prisma } from './db.js';
 
-export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE';
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'VIEW';
 export type EntityType = 'PROJECT' | 'ENVIRONMENT' | 'VARIABLE' | 'SCHEMA';
 
 export interface AuditDetails {

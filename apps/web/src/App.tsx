@@ -4,6 +4,7 @@ import Projects from './pages/Projects'
 import Project from './pages/Project'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import Welcome from './pages/Welcome'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -55,14 +56,27 @@ function UserBadge() {
 
 function AppContent() {
   const location = useLocation()
+  const { user, isLoading } = useAuth()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
+
+  // Show welcome page for non-authenticated users
+  if (!isLoading && !user && !isAuthPage) {
+    return (
+      <Routes>
+        <Route path="/" element={<Welcome />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    )
+  }
 
   if (isAuthPage) {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     )
   }

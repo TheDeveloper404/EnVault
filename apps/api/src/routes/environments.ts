@@ -4,8 +4,13 @@ import { createEnvironmentSchema, upsertVariableSchema, importEnvSchema, exportQ
 import { logAudit } from '../audit.js';
 import { encryptValue, decryptValue, detectSecret } from '../crypto.js';
 import { parseEnv } from '@envault/core';
+import { authenticate } from './auth.js';
 
 export async function environmentRoutes(fastify: FastifyInstance): Promise<void> {
+  
+  // All routes require authentication
+  fastify.addHook('preHandler', authenticate);
+
   // GET /projects/:id/environments - List environments
   fastify.get('/', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
@@ -81,6 +86,13 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
     if (!environment) {
       return reply.status(404).send({ error: 'Environment not found' });
     }
+
+    // Audit log for viewing variables
+    const secretKeys = environment.variables.filter((v: { isSecret: boolean }) => v.isSecret).map((v: { key: string }) => v.key);
+    await logAudit('VIEW', 'VARIABLE', environment.id, projectId, { 
+      varCount: environment.variables.length,
+      secretKeys: secretKeys.length > 0 ? secretKeys : undefined 
+    });
 
     return environment.variables.map((v: { id: string; key: string; value: string; isSecret: boolean; createdAt: Date; updatedAt: Date }) => ({
       id: v.id,

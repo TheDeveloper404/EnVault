@@ -9,12 +9,26 @@ import { prisma } from './db.js';
 
 const startTime = Date.now();
 
+const ALLOWED_IPS = (process.env.ALLOWED_IPS || '').split(',').filter(Boolean);
+const IP_WHITELIST_ENABLED = process.env.IP_WHITELIST_ENABLED === 'true';
+
+async function ipWhitelistHook(request: { ip?: string }, reply: { status: (code: number) => { send: (data: { error: string }) => void } }) {
+  if (!IP_WHITELIST_ENABLED || ALLOWED_IPS.length === 0) return;
+  if (ALLOWED_IPS.includes(request.ip || '')) return;
+  
+  return reply.status(403).send({ error: 'Access denied from your IP address' });
+}
+
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: {
       level: process.env.LOG_LEVEL || 'info'
     }
   });
+
+  if (IP_WHITELIST_ENABLED) {
+    fastify.addHook('preHandler', ipWhitelistHook);
+  }
 
   await fastify.register(rateLimit, {
     max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
