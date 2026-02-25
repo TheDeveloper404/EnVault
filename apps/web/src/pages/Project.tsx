@@ -15,6 +15,7 @@ import {
   Terminal,
   Trash2
 } from 'lucide-react'
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
 
 interface Variable {
   id: string
@@ -39,6 +40,10 @@ export default function Project() {
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
   const [isImporting, setIsImporting] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; envName: string }>({
+    isOpen: false,
+    envName: ''
+  })
 
   useEffect(() => {
     if (!id) return
@@ -125,19 +130,26 @@ export default function Project() {
   }
 
   const deleteEnvironment = async (envName: string) => {
-    if (!confirm(`Are you sure you want to delete environment "${envName}"? This will delete all variables in this environment.`)) return
-    
-    const res = await fetch(`/api/projects/${id}/environments/${envName}`, {
+    setDeleteModal({ isOpen: true, envName })
+  }
+
+  const handleDeleteConfirm = async () => {
+    const res = await fetch(`/api/projects/${id}/environments/${deleteModal.envName}`, {
       method: 'DELETE'
     })
 
     if (res.ok) {
-      setEnvironments(environments.filter(e => e.name !== envName))
-      if (activeEnv === envName && environments.length > 1) {
-        const remaining = environments.filter(e => e.name !== envName)
+      setEnvironments(environments.filter(e => e.name !== deleteModal.envName))
+      if (activeEnv === deleteModal.envName && environments.length > 1) {
+        const remaining = environments.filter(e => e.name !== deleteModal.envName)
         setActiveEnv(remaining[0]?.name || 'local')
       }
     }
+    setDeleteModal({ isOpen: false, envName: '' })
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteModal({ isOpen: false, envName: '' })
   }
 
   const activeEnvironment = environments.find(e => e.name === activeEnv)
@@ -214,9 +226,9 @@ export default function Project() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-2 gap-6">
         {/* Import Section */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="space-y-6">
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <Upload className="w-5 h-5 text-emerald-400" />
@@ -263,7 +275,7 @@ export default function Project() {
         </div>
 
         {/* Variables List */}
-        <div className="lg:col-span-2">
+        <div>
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden">
             {/* Table Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
@@ -349,6 +361,15 @@ export default function Project() {
           </div>
         </div>
       </div>
+
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        title="Delete Environment"
+        message={`Are you sure you want to delete environment "${deleteModal.envName}"? This will delete all variables in this environment.`}
+        confirmLabel="Delete Environment"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </div>
   )
 }

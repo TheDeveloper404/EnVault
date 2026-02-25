@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { FolderGit2, Plus, ArrowRight, Layers, Sparkles, Trash2 } from 'lucide-react'
+import { FolderGit2, Plus, Layers, Sparkles, Trash2, Pencil } from 'lucide-react'
+import DeleteConfirmModal from '../components/DeleteConfirmModal'
+import RenameModal from '../components/RenameModal'
 
 interface Project {
   id: string
@@ -14,6 +16,16 @@ export default function Projects() {
   const [loading, setLoading] = useState(true)
   const [newProjectName, setNewProjectName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; projectId: string; projectName: string }>({
+    isOpen: false,
+    projectId: '',
+    projectName: ''
+  })
+  const [renameModal, setRenameModal] = useState<{ isOpen: boolean; projectId: string; projectName: string }>({
+    isOpen: false,
+    projectId: '',
+    projectName: ''
+  })
 
   useEffect(() => {
     fetch('/api/projects')
@@ -44,15 +56,52 @@ export default function Projects() {
   }
 
   const deleteProject = async (projectId: string) => {
-    if (!confirm('Are you sure you want to delete this project? This action cannot be undone.')) return
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
     
-    const res = await fetch(`/api/projects/${projectId}`, {
+    setDeleteModal({ isOpen: true, projectId, projectName: project.name })
+  }
+
+  const handleDeleteConfirm = async () => {
+    const res = await fetch(`/api/projects/${deleteModal.projectId}`, {
       method: 'DELETE'
     })
 
     if (res.ok) {
-      setProjects(projects.filter(p => p.id !== projectId))
+      setProjects(projects.filter(p => p.id !== deleteModal.projectId))
     }
+    setDeleteModal({ isOpen: false, projectId: '', projectName: '' })
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteModal({ isOpen: false, projectId: '', projectName: '' })
+  }
+
+  const renameProject = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
+    setRenameModal({ isOpen: true, projectId, projectName: project.name })
+  }
+
+  const handleRename = async (newName: string) => {
+    const res = await fetch(`/api/projects/${renameModal.projectId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName })
+    })
+
+    if (!res.ok) {
+      const err = await res.json()
+      throw new Error(err.error || 'Failed to rename')
+    }
+
+    const updated = await res.json()
+    setProjects(projects.map(p => p.id === updated.id ? { ...p, name: updated.name } : p))
+    setRenameModal({ isOpen: false, projectId: '', projectName: '' })
+  }
+
+  const handleRenameCancel = () => {
+    setRenameModal({ isOpen: false, projectId: '', projectName: '' })
   }
 
   if (loading) {
@@ -144,10 +193,17 @@ export default function Projects() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 pt-2">
-                  <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium opacity-0 group-hover:opacity-100 transform translate-x-[-10px] group-hover:translate-x-0 transition-all">
-                    <span>View Project</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      renameProject(project.id)
+                    }}
+                    className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                    title="Rename project"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.preventDefault()
@@ -176,6 +232,22 @@ export default function Projects() {
           </p>
         </div>
       )}
+
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        title="Delete Project"
+        message={`Are you sure you want to delete "${deleteModal.projectName}"? This action cannot be undone and will delete all environments and variables.`}
+        confirmLabel="Delete Project"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
+
+      <RenameModal
+        isOpen={renameModal.isOpen}
+        currentName={renameModal.projectName}
+        onRename={handleRename}
+        onCancel={handleRenameCancel}
+      />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import { projectRoutes } from './routes/projects.js';
 import { environmentRoutes } from './routes/environments.js';
 import { schemaRoutes } from './routes/schema.js';
+import { authRoutes } from './routes/auth.js';
 import { prisma } from './db.js';
 
 const startTime = Date.now();
@@ -18,7 +19,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(rateLimit, {
     max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
     timeWindow: parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10),
-    allowList: ['/health', '/metrics'],
+    allowList: ['/health', '/metrics', '/auth/login', '/auth/register'],
     errorResponseBuilder: () => ({
       error: 'Too many requests',
       message: 'Rate limit exceeded. Please try again later.',
@@ -69,6 +70,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     };
   });
 
+  await fastify.register(authRoutes, { prefix: '/auth' });
   await fastify.register(projectRoutes, { prefix: '/projects' });
   await fastify.register(environmentRoutes, { prefix: '/projects/:id/environments' });
   await fastify.register(environmentRoutes, { prefix: '/projects/:id/envs' });

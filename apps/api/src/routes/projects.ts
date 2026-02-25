@@ -2,11 +2,16 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '../db.js';
 import { createProjectSchema } from '../schemas.js';
 import { logAudit } from '../audit.js';
+import { authenticate } from './auth.js';
 
 export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
-  // GET /projects - List all projects
-  fastify.get('/', async () => {
+  
+  // GET /projects - List all projects (authenticated)
+  fastify.get('/', { preHandler: [authenticate] }, async (request) => {
+    const userId = request.user!.id;
+    
     const projects = await prisma.project.findMany({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
@@ -25,8 +30,9 @@ export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
     }));
   });
 
-  // POST /projects - Create project
-  fastify.post('/', async (request, reply) => {
+  // POST /projects - Create project (authenticated)
+  fastify.post('/', { preHandler: [authenticate] }, async (request, reply) => {
+    const userId = request.user!.id;
     const input = createProjectSchema.parse(request.body);
 
     const existing = await prisma.project.findUnique({
@@ -38,7 +44,10 @@ export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     const project = await prisma.project.create({
-      data: input
+      data: {
+        ...input,
+        userId
+      }
     });
 
     await logAudit('CREATE', 'PROJECT', project.id, project.id);
@@ -52,12 +61,13 @@ export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
     });
   });
 
-  // GET /projects/:id - Get single project
-  fastify.get('/:id', async (request, reply) => {
+  // GET /projects/:id - Get single project (authenticated)
+  fastify.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const userId = request.user!.id;
 
-    const project = await prisma.project.findUnique({
-      where: { id },
+    const project = await prisma.project.findFirst({
+      where: { id, userId },
       include: {
         environments: {
           orderBy: { createdAt: 'asc' },
@@ -82,11 +92,48 @@ export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
     };
   });
 
-  // DELETE /projects/:id - Delete project
-  fastify.delete('/:id', async (request, reply) => {
+  // PATCH /projects/:id - Update project (rename) (authenticated)
+  fastify.patch('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const userId = request.user!.id;
+    const { name } = request.body as { name?: string };
 
-    const project = await prisma.project.findUnique({ where: { id } });
+    const project = await prisma.project.findFirst({ where: { id: id, userId } });
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    if (name && name !== project.name) {
+      const existing = await prisma.project.findUnique({
+        where: { name }
+      });
+      if (existing) {
+        return reply.status(409).send({ error: 'Project with this name already exists' });
+      }
+    }
+
+    const updated = await prisma.project.update({
+      where: { id },
+      data: { name }
+    });
+
+    await logAudit('UPDATE', 'PROJECT', id, id, { oldName: project.name, newName: name });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      description: updated.description,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString()
+    };
+  });
+
+  // DELETE /projects/:id - Delete project (authenticated)
+  fastify.delete('/:id', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const userId = request.user!.id;
+
+    const project = await prisma.project.findFirst({ where: { id, userId } });
     if (!project) {
       return reply.status(404).send({ error: 'Project not found' });
     }

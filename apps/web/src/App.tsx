@@ -1,11 +1,71 @@
-import { Routes, Route, Link, useLocation } from 'react-router-dom'
-import { Shield, LayoutDashboard } from 'lucide-react'
+import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom'
+import { Shield, LogOut, User } from 'lucide-react'
 import Projects from './pages/Projects'
 import Project from './pages/Project'
+import Login from './pages/Login'
+import Signup from './pages/Signup'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
-function App() {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth()
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
+
+function LogoutButton() {
+  const { logout, user } = useAuth()
+  
+  if (!user) return null
+
+  return (
+    <button
+      onClick={logout}
+      className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"
+    >
+      <LogOut className="w-4 h-4" />
+      <span className="text-sm">Logout</span>
+    </button>
+  )
+}
+
+function UserBadge() {
+  const { user } = useAuth()
+  
+  if (!user) return null
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
+      <User className="w-4 h-4 text-slate-400" />
+      <span className="text-sm text-slate-300">{user.name || user.email}</span>
+    </div>
+  )
+}
+
+function AppContent() {
   const location = useLocation()
-  const isProjects = location.pathname === '/'
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
+
+  if (isAuthPage) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -23,11 +83,9 @@ function App() {
               </div>
             </Link>
             
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                <LayoutDashboard className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm text-slate-300">{isProjects ? 'Projects' : 'Project View'}</span>
-              </div>
+            <div className="flex items-center gap-3">
+              <UserBadge />
+              <LogoutButton />
             </div>
           </div>
         </div>
@@ -36,8 +94,18 @@ function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
         <Routes>
-          <Route path="/" element={<Projects />} />
-          <Route path="/projects/:id" element={<Project />} />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Projects />
+            </ProtectedRoute>
+          } />
+          <Route path="/projects/:id" element={
+            <ProtectedRoute>
+              <Project />
+            </ProtectedRoute>
+          } />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
         </Routes>
       </main>
 
@@ -51,6 +119,14 @@ function App() {
         </div>
       </footer>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
 

@@ -8,10 +8,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  projects     Project[]
+}
+
 model Project {
   id          String        @id @default(uuid())
   name        String        @unique
   description String?
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   environments Environment[]
@@ -55,12 +67,13 @@ model Schema {
 
 model AuditLog {
   id          String   @id @default(uuid())
-  action      String   // CREATE, UPDATE, DELETE
+  action      String   // CREATE, UPDATE, DELETE, VIEW
   entityType  String   // PROJECT, ENVIRONMENT, VARIABLE, SCHEMA
   entityId    String
   projectId   String?
   project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  actor       String   // hostname or "local-user"
+  userId      String?
+  actor       String   // user email or "local-user"
   details     String?  // JSON with changes (masked for secrets)
   createdAt   DateTime @default(now())
 }
