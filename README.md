@@ -46,8 +46,8 @@ pnpm dev
 ```
 
 This starts:
-- API on http://localhost:7777
-- Web UI on http://localhost:3000
+- API on http://localhost:3093
+- Web UI on http://localhost:3092
 
 ### Docker (Production)
 
@@ -61,8 +61,8 @@ docker-compose up -d
 ```
 
 Access:
-- Web UI: http://localhost:3000
-- API: http://localhost:7777
+- Web UI: http://localhost:3092
+- API: http://localhost:3093
 
 ## CLI Usage
 
@@ -145,7 +145,7 @@ Secrets are:
     "PORT": {
       "type": "number",
       "required": true,
-      "default": "3000"
+      "default": "3091"
     },
     "DATABASE_URL": {
       "type": "string",
@@ -169,7 +169,7 @@ Secrets are:
 DATABASE_URL=
 
 # Optional with default
-PORT=3000
+PORT=3091
 DEBUG=false
 ```
 
@@ -231,7 +231,9 @@ Production deploy is done from the main branch using Railway configuration in `r
 |----------|----------|-------------|
 | `ENVALT_MASTER_KEY` | Yes | 64-char hex or base64 key for encryption |
 | `DATABASE_URL` | No | SQLite path (default: `file:./envault.db`) |
-| `PORT` | No | API port (default: 7777) |
+| `PORT` | No | Backend/API service port (default: 3091) |
+| `API_PORT` | No | Public API listener port (default: 3093) |
+| `VITE_PORT` | No | Web UI dev server port (default: 3092) |
 | `HOST` | No | API host (default: 0.0.0.0) |
 | `LOG_LEVEL` | No | debug, info, warn, error (default: info) |
 | `CORS_ORIGIN` | No | CORS origin (default: true = any) |

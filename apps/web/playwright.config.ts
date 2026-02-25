@@ -11,30 +11,31 @@ export default defineConfig({
   },
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:4001',
+    baseURL: 'http://localhost:3092',
     trace: 'on-first-retry'
   },
   webServer: [
     {
       command: 'pnpm --dir ../.. --filter @envault/api dev:e2e',
-      url: 'http://127.0.0.1:4000/health',
+      url: 'http://127.0.0.1:3093/health',
       reuseExistingServer: true,
       timeout: 120_000,
       env: {
         ENVAULT_MASTER_KEY: MASTER_KEY,
         DATABASE_URL: 'file:./prisma/e2e.db',
-        PORT: '4000',
+        API_PORT: '3093',
+        PORT: '3091',
         HOST: '127.0.0.1'
       }
     },
     {
       command: 'pnpm --dir ../.. --filter @envault/web dev',
-      url: 'http://localhost:4001',
+      url: 'http://localhost:3092',
       reuseExistingServer: true,
       timeout: 120_000,
       env: {
-        VITE_API_PROXY_TARGET: 'http://127.0.0.1:4000',
-        VITE_PORT: '4001'
+        VITE_API_PROXY_TARGET: 'http://127.0.0.1:3093',
+        VITE_PORT: '3092'
       }
     }
   ],

@@ -13,13 +13,14 @@ services:
       - DATABASE_URL=file:/data/envault.db
       - ENVAULT_MASTER_KEY=${ENVAULT_MASTER_KEY:-aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344}
       - NODE_ENV=production
-      - PORT=4000
+      - API_PORT=3093
+      - PORT=3091
     volumes:
       - envault-api-data:/data
     ports:
-      - "4000:4000"
+      - "3093:3093"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4000/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3093/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -34,7 +35,7 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile.web
     ports:
-      - "4001:80"
+      - "3092:80"
     depends_on:
       - envault-api
     restart: unless-stopped

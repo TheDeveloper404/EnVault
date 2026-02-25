@@ -8,7 +8,7 @@ afterEach(() => {
 
 describe('cli api client', () => {
   it('uses default API URL when ENVALT_API_URL is not set', () => {
-    expect(getApiUrl()).toBe('http://localhost:4000');
+    expect(getApiUrl()).toBe('http://localhost:3093');
   });
 
   it('uses ENVALT_API_URL when configured', () => {
@@ -26,7 +26,7 @@ describe('cli api client', () => {
     const result = await apiFetch('/health');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:4000/health',
+      'http://localhost:3093/health',
       expect.objectContaining({
         headers: expect.objectContaining({ 'Content-Type': 'application/json' })
       })
