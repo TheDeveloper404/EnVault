@@ -27,20 +27,21 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 rounded-full border border-emerald-500/20 mb-4">
-            <Shield className="w-5 h-5 text-emerald-400" />
-            <span className="text-sm text-emerald-300">EnVault</span>
+    <div className="min-h-screen bg-slate-900 flex flex-col">
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 rounded-full border border-emerald-500/20 mb-4">
+              <Shield className="w-5 h-5 text-emerald-400" />
+              <span className="text-sm text-emerald-300">EnVault</span>
+            </div>
+            <h1 className="text-3xl font-bold text-white">Welcome back</h1>
+            <p className="text-slate-400 mt-2">Sign in to access your environment variables</p>
           </div>
-          <h1 className="text-3xl font-bold text-white">Welcome back</h1>
-          <p className="text-slate-400 mt-2">Sign in to access your environment variables</p>
-        </div>
 
-        {/* Form */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-8">
+          {/* Form */}
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-8">
           {error && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400">
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -100,8 +101,15 @@ export default function Login() {
               Demo account: <span className="text-slate-400">demo@envault.local</span> / <span className="text-slate-400">demo123</span>
             </p>
           </div>
+          </div>
         </div>
       </div>
+
+      <footer className="border-t border-slate-800">
+        <div className="max-w-6xl mx-auto px-6 py-5 text-center text-sm text-slate-500">
+          Powered by @ACL Smart Software
+        </div>
+      </footer>
     </div>
   );
 }
