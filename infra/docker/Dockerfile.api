@@ -36,6 +36,6 @@ COPY --from=envault_api_builder /app/apps/api/package.json ./apps/api/package.js
 
 WORKDIR /app/apps/api
 
-EXPOSE 4000
+EXPOSE 3093
 
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

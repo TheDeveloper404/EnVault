@@ -10,8 +10,6 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "test": "vitest run --passWithNoTests",
-    "test:unit": "vitest run",
     "lint": "echo Lint not configured for @envault/cli yet",
     "typecheck": "tsc --noEmit"
   },

@@ -9,8 +9,6 @@
     "dev": "tsx watch src/index.ts",
     "dev:e2e": "pnpm db:deploy && pnpm dev",
     "start": "node dist/index.js",
-    "test": "vitest run --passWithNoTests",
-    "test:integration": "vitest run tests/integration --passWithNoTests",
     "test:watch": "vitest",
     "lint": "echo Lint not configured for @envault/api yet",
     "typecheck": "tsc --noEmit",

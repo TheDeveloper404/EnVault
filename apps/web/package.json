@@ -7,8 +7,6 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run src --passWithNoTests",
-    "test:e2e": "playwright test",
     "lint": "echo Lint not configured for @envault/web yet",
     "typecheck": "tsc --noEmit"
   },

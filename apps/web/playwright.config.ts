@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const MASTER_KEY = 'aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344';
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: '../../tests/e2e',
   fullyParallel: false,
   timeout: 60_000,
   expect: {
