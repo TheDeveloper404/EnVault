@@ -105,7 +105,21 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   // GitHub OAuth
   const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
   const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
-  const APP_URL = process.env.APP_URL || 'http://localhost:3093';
+  const APP_URL = (process.env.APP_URL || '').replace(/\/$/, '');
+  const GITHUB_CALLBACK_PATH = process.env.GITHUB_CALLBACK_PATH || '/auth/github/callback';
+
+  const resolveAppUrl = (request: FastifyRequest) => {
+    if (APP_URL) return APP_URL;
+    const host = request.headers['x-forwarded-host'] || request.headers.host;
+    const proto = (request.headers['x-forwarded-proto'] as string | undefined) || 'http';
+    return `${proto}://${host}`.replace(/\/$/, '');
+  };
+
+  const resolveGithubCallbackUrl = (request: FastifyRequest) => {
+    const appUrl = resolveAppUrl(request);
+    const callbackPath = GITHUB_CALLBACK_PATH.startsWith('/') ? GITHUB_CALLBACK_PATH : `/${GITHUB_CALLBACK_PATH}`;
+    return `${appUrl}${callbackPath}`;
+  };
 
   // GET /auth/github - Redirect to GitHub
   fastify.get('/github', async (request, reply) => {
@@ -114,45 +128,53 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     }
     
     const scope = 'read:user user:email';
-    const redirectUri = `${APP_URL}/auth/github/callback`;
     const state = Math.random().toString(36).substring(7);
+    const githubCallbackUrl = resolveGithubCallbackUrl(request);
     
     reply.redirect(
-      `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}`
+      `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(githubCallbackUrl)}&scope=${encodeURIComponent(scope)}&state=${state}`
     );
   });
 
   // GET /auth/github/callback - Handle GitHub callback
   fastify.get('/github/callback', async (request, reply) => {
-    const { code, state } = request.query as { code?: string; state?: string };
+    const { code } = request.query as { code?: string; state?: string };
+    const appUrl = resolveAppUrl(request);
+    const githubCallbackUrl = resolveGithubCallbackUrl(request);
     
     if (!code) {
-      return reply.redirect(`${APP_URL}/login?error=github_auth_failed`);
+      return reply.redirect(`${appUrl}/login?error=github_auth_failed`);
     }
 
     if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
-      return reply.redirect(`${APP_URL}/login?error=github_not_configured`);
+      return reply.redirect(`${appUrl}/login?error=github_not_configured`);
     }
 
     try {
       // Exchange code for access token
+      const tokenPayload = new URLSearchParams({
+        client_id: GITHUB_CLIENT_ID,
+        client_secret: GITHUB_CLIENT_SECRET,
+        code,
+        redirect_uri: githubCallbackUrl
+      });
+
       const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
           Accept: 'application/json'
         },
-        body: JSON.stringify({
-          client_id: GITHUB_CLIENT_ID,
-          client_secret: GITHUB_CLIENT_SECRET,
-          code
-        })
+        body: tokenPayload.toString()
       });
 
-      const tokenData = await tokenRes.json() as { access_token?: string; error?: string };
+      const tokenData = await tokenRes.json() as { access_token?: string; error?: string; error_description?: string };
       
-      if (!tokenData.access_token) {
-        return reply.redirect(`${APP_URL}/login?error=github_token_failed`);
+      console.log('GitHub token response:', tokenData);
+      
+      if (!tokenRes.ok || !tokenData.access_token) {
+        console.error('GitHub token failed:', tokenData);
+        return reply.redirect(`${appUrl}/login?error=github_token_failed&reason=${encodeURIComponent(tokenData.error || 'unknown')}&description=${encodeURIComponent(tokenData.error_description || '')}`);
       }
 
       // Get user info
@@ -203,10 +225,10 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         { expiresIn: '7d' }
       );
 
-      reply.redirect(`${APP_URL}/?token=${token}`);
+      reply.redirect(`${appUrl}/?token=${token}`);
     } catch (error) {
       console.error('GitHub OAuth error:', error);
-      return reply.redirect(`${APP_URL}/login?error=github_auth_error`);
+      return reply.redirect(`${appUrl}/login?error=github_auth_error`);
     }
   });
 }
