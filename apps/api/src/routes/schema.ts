@@ -3,7 +3,7 @@ import { prisma } from '../db.js';
 import { setSchemaSchema, validateQuerySchema, diffQuerySchema } from '../schemas.js';
 import { logAudit } from '../audit.js';
 import { decryptValue } from '../crypto.js';
-import { parseEnvExample, parseSchemaJson, validateEnv, diffEnvs, maskValue, isSecretKey } from '@envault/core';
+import { parseEnvExample, parseSchemaJson, validateEnv, diffEnvs } from '@envault/core';
 
 export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /schema - Set schema

@@ -3,7 +3,7 @@ import { prisma } from '../db.js';
 import { createEnvironmentSchema, upsertVariableSchema, importEnvSchema, exportQuerySchema } from '../schemas.js';
 import { logAudit } from '../audit.js';
 import { encryptValue, decryptValue, detectSecret } from '../crypto.js';
-import { parseEnv, serializeEnv, isSecretKey } from '@envault/core';
+import { parseEnv } from '@envault/core';
 
 export async function environmentRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /projects/:id/environments - List environments

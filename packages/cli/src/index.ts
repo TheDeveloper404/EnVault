@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { apiFetch, apiFetchText } from './api.js';
-import { parseEnv, formatDiff, parseEnvExample, parseSchemaJson } from '@envault/core';
+import { formatDiff } from '@envault/core';
 
 const program = new Command();
 

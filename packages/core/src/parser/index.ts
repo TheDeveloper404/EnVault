@@ -65,7 +65,7 @@ export function parseEnv(content: string, options: ParseOptions = {}): ParseResu
     }
 
     const key = trimmed.substring(0, equalIndex).trim();
-    let value = trimmed.substring(equalIndex + 1);
+    const value = trimmed.substring(equalIndex + 1);
 
     // Parse value with quotes
     const parsedValue = parseValue(value);
@@ -122,7 +122,7 @@ function parseValue(value: string): string {
 /**
  * Serialize entries back to .env format
  */
-export function serializeEnv(entries: EnvEntry[], options: { preserveOrder?: boolean } = {}): string {
+export function serializeEnv(entries: EnvEntry[], _options: { preserveOrder?: boolean } = {}): string {
   const lines: string[] = [];
 
   for (const entry of entries) {
