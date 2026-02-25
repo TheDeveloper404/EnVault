@@ -3,6 +3,24 @@ version: '3.8'
 name: envault
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: envault-postgres
+    environment:
+      POSTGRES_USER: envault
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-envault_dev_password}
+      POSTGRES_DB: envault
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U envault"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - envault-network
+
   envault-api:
     image: envault-api:latest
     container_name: envault-api
@@ -10,15 +28,24 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile.api
     environment:
-      - DATABASE_URL=file:/data/envault.db
+      - DATABASE_URL=postgresql://envault:${DB_PASSWORD:-envault_dev_password}@postgres:5432/envault
       - ENVAULT_MASTER_KEY=${ENVAULT_MASTER_KEY:-aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344}
       - NODE_ENV=production
       - API_PORT=3093
       - PORT=3091
-    volumes:
-      - envault-api-data:/data
+      - LOG_LEVEL=info
+      - RATE_LIMIT_MAX=100
+      - RATE_LIMIT_WINDOW=60000
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "3093:3093"
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3093/health"]
       interval: 30s
@@ -43,7 +70,7 @@ services:
       - envault-network
 
 volumes:
-  envault-api-data:
+  postgres-data:
     driver: local
 
 networks:

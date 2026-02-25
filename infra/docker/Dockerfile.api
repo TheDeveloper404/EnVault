@@ -21,8 +21,8 @@ FROM node:20-alpine AS envault_api_runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Install runtime tools required by Prisma and SQLite
-RUN apk add --no-cache sqlite openssl
+# Install runtime tools required by Prisma and PostgreSQL
+RUN apk add --no-cache libpq openssl
 
 # Copy built artifacts
 COPY --from=envault_api_builder /app/packages/core/dist ./packages/core/dist

@@ -22,7 +22,7 @@ export default defineConfig({
       timeout: 120_000,
       env: {
         ENVAULT_MASTER_KEY: MASTER_KEY,
-        DATABASE_URL: 'file:./prisma/e2e.db',
+        DATABASE_URL: 'postgresql://envault:envault_dev_password@localhost:5432/envault_e2e',
         API_PORT: '3093',
         PORT: '3091',
         HOST: '127.0.0.1'

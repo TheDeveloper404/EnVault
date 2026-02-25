@@ -1,13 +1,11 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
 jobs:
-  lint-and-typecheck:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,10 +18,8 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install
       - run: pnpm lint
-      - run: pnpm --filter @envault/core build
-      - run: pnpm typecheck
 
-  test-core:
+  typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,9 +31,23 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
       - run: pnpm install
-      - run: pnpm --filter @envault/core test
+      - run: pnpm typecheck
 
-  test-api:
+  test-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install
+      - run: pnpm test:unit
+
+  test-integration:
     runs-on: ubuntu-latest
     env:
       ENVAULT_MASTER_KEY: aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344
@@ -54,25 +64,11 @@ jobs:
       - run: pnpm install
       - run: pnpm --filter @envault/api db:generate
       - run: pnpm --filter @envault/api db:migrate
-      - run: pnpm --filter @envault/api test:integration
-
-  test-cli:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-      - run: pnpm install
-      - run: pnpm --filter @envault/cli test
+      - run: pnpm test:integration
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test-core]
+    needs: [lint, typecheck, test-unit, test-integration]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
@@ -84,3 +80,20 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install
       - run: pnpm build
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install
+      - run: pnpm build
+      - run: npx playwright install --with-deps
+      - run: pnpm test:e2e
