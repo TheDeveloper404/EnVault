@@ -5,8 +5,10 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'envault-dev-secret-change-in-production');
-const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'];
+const ACCESS_TOKEN_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '15m') as jwt.SignOptions['expiresIn'];
+const REFRESH_TOKEN_EXPIRES_DAYS = parseInt(process.env.REFRESH_TOKEN_EXPIRES_DAYS || '30', 10);
 const AUTH_COOKIE_NAME = 'envault_session';
+const REFRESH_COOKIE_NAME = 'envault_refresh';
 const OAUTH_STATE_COOKIE_NAME = 'envault_oauth_state';
 
 if (!JWT_SECRET) {
@@ -28,13 +30,31 @@ declare module 'fastify' {
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   const isProduction = process.env.NODE_ENV === 'production';
 
+  const createAccessToken = (user: { id: string; email: string }) => jwt.sign(
+    { id: user.id, email: user.email },
+    JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_EXPIRES_IN }
+  );
+
+  const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
+
   const setAuthCookie = (reply: FastifyReply, token: string) => {
     reply.setCookie(AUTH_COOKIE_NAME, token, {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
       secure: isProduction,
-      maxAge: 60 * 60 * 24 * 7
+      maxAge: 60 * 15
+    });
+  };
+
+  const setRefreshCookie = (reply: FastifyReply, token: string) => {
+    reply.setCookie(REFRESH_COOKIE_NAME, token, {
+      path: '/auth',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isProduction,
+      maxAge: 60 * 60 * 24 * REFRESH_TOKEN_EXPIRES_DAYS
     });
   };
 
@@ -45,6 +65,29 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       sameSite: 'lax',
       secure: isProduction
     });
+
+    reply.clearCookie(REFRESH_COOKIE_NAME, {
+      path: '/auth',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isProduction
+    });
+  };
+
+  const issueSession = async (reply: FastifyReply, userId: string) => {
+    const refreshToken = crypto.randomBytes(48).toString('hex');
+    const refreshHash = hashToken(refreshToken);
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
+
+    await prisma.session.create({
+      data: {
+        userId,
+        refreshHash,
+        expiresAt
+      }
+    });
+
+    setRefreshCookie(reply, refreshToken);
   };
 
   
@@ -75,13 +118,10 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       }
     });
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    const token = createAccessToken(user);
 
     setAuthCookie(reply, token);
+    await issueSession(reply, user.id);
 
     return reply.status(201).send({
       user: {
@@ -111,13 +151,10 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       return reply.status(401).send({ error: 'Invalid email or password' });
     }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    const token = createAccessToken(user);
 
     setAuthCookie(reply, token);
+    await issueSession(reply, user.id);
 
     return {
       user: {
@@ -135,9 +172,76 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   // POST /auth/logout - Clear active session cookie
-  fastify.post('/logout', async (_request, reply) => {
+  fastify.post('/logout', async (request, reply) => {
+    const refreshToken = request.cookies[REFRESH_COOKIE_NAME];
+    if (refreshToken) {
+      const refreshHash = hashToken(refreshToken);
+      await prisma.session.updateMany({
+        where: { refreshHash, revokedAt: null },
+        data: { revokedAt: new Date() }
+      });
+    }
+
     clearAuthCookie(reply);
     return reply.status(204).send();
+  });
+
+  // POST /auth/logout-all - Revoke all active refresh sessions for current user
+  fastify.post('/logout-all', { preHandler: [authenticate] }, async (request, reply) => {
+    await prisma.session.updateMany({
+      where: {
+        userId: request.user!.id,
+        revokedAt: null
+      },
+      data: { revokedAt: new Date() }
+    });
+
+    clearAuthCookie(reply);
+    return reply.status(204).send();
+  });
+
+  // POST /auth/refresh - Rotate refresh session and issue new access token
+  fastify.post('/refresh', async (request, reply) => {
+    const refreshToken = request.cookies[REFRESH_COOKIE_NAME];
+    if (!refreshToken) {
+      return reply.status(401).send({ error: 'No refresh token provided' });
+    }
+
+    const refreshHash = hashToken(refreshToken);
+    const session = await prisma.session.findUnique({
+      where: { refreshHash },
+      include: { user: true }
+    });
+
+    if (!session || session.revokedAt || session.expiresAt <= new Date()) {
+      if (session && !session.revokedAt) {
+        await prisma.session.update({
+          where: { id: session.id },
+          data: { revokedAt: new Date() }
+        });
+      }
+      clearAuthCookie(reply);
+      return reply.status(401).send({ error: 'Invalid refresh session' });
+    }
+
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { revokedAt: new Date() }
+    });
+
+    await issueSession(reply, session.user.id);
+
+    const token = createAccessToken(session.user);
+    setAuthCookie(reply, token);
+
+    return {
+      user: {
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name
+      },
+      token
+    };
   });
 
   // GitHub OAuth
@@ -279,13 +383,10 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       }
 
       // Generate JWT
-      const token = jwt.sign(
-        { id: user.id, email: user.email },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRES_IN }
-      );
+      const token = createAccessToken(user);
 
       setAuthCookie(reply, token);
+      await issueSession(reply, user.id);
 
       reply.redirect(`${appUrl}/`);
     } catch (error) {

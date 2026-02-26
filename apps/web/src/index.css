@@ -6,6 +6,20 @@
   body {
     @apply bg-gray-50 text-gray-900;
   }
+
+@keyframes page-fade-in-subtle {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+    filter: blur(1px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
 }
 
 @keyframes page-fade-in {
@@ -25,8 +39,17 @@
   will-change: opacity, transform;
 }
 
+.page-transition-subtle {
+  animation: page-fade-in-subtle 180ms ease-out;
+  will-change: opacity, transform, filter;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-transition {
+    animation: none;
+  }
+
+  .page-transition-subtle {
     animation: none;
   }
 }

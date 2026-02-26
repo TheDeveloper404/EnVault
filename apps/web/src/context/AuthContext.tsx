@@ -24,26 +24,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const allowE2EBypass = import.meta.env.VITE_E2E_AUTH_BYPASS === '1';
+    let isActive = true;
 
-    fetch('/api/auth/me', {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined
-    })
-      .then(res => {
-        if (res.ok) return res.json();
-        if (allowE2EBypass) {
-          return fetch('/api/auth/me').then(e2eRes => (e2eRes.ok ? e2eRes.json() : Promise.reject(new Error('Invalid session'))));
+    const bootstrapSession = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+
+        if (!res.ok) {
+          if (token) {
+            const tokenRes = await fetch('/api/auth/me', {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (tokenRes.ok) {
+              const tokenData = await tokenRes.json() as { user: User };
+              if (isActive) setUser(tokenData.user);
+              return;
+            }
+          }
+
+          if (allowE2EBypass) {
+            const e2eRes = await fetch('/api/auth/me');
+            if (!e2eRes.ok) throw new Error('Invalid session');
+            const e2eData = await e2eRes.json() as { user: User };
+            if (isActive) setUser(e2eData.user);
+            return;
+          }
+          throw new Error('Invalid session');
         }
-        throw new Error('Invalid session');
-      })
-      .then(data => {
-        setUser(data.user);
-      })
-      .catch(() => {
-        localStorage.removeItem('token');
-        setToken(null);
-        setUser(null);
-      })
-      .finally(() => setIsLoading(false));
+
+        const data = await res.json() as { user: User };
+        if (isActive) setUser(data.user);
+      } catch {
+        if (isActive) {
+          localStorage.removeItem('token');
+          setToken(null);
+          setUser(null);
+        }
+      } finally {
+        if (isActive) setIsLoading(false);
+      }
+    };
+
+    void bootstrapSession();
+
+    return () => {
+      isActive = false;
+    };
   }, [token]);
 
   const login = async (email: string, password: string) => {
@@ -109,19 +136,33 @@ export function useAuth() {
 }
 
 export function useApi() {
-  const { token, logout } = useAuth();
+  const { logout } = useAuth();
 
   const apiFetch = async (url: string, options: RequestInit = {}) => {
-    const headers = {
-      ...options.headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    };
-
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, options);
 
     if (res.status === 401) {
-      logout();
-      throw new Error('Session expired');
+      const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' });
+
+      if (!refreshRes.ok) {
+        logout();
+        throw new Error('Session expired');
+      }
+
+      const refreshData = await refreshRes.json() as { token?: string; user?: { id: string; email: string; name: string | null } };
+
+      if (refreshData.token) {
+        localStorage.setItem('token', refreshData.token);
+      }
+
+      const retryRes = await fetch(url, options);
+
+      if (retryRes.status === 401) {
+        logout();
+        throw new Error('Session expired');
+      }
+
+      return retryRes;
     }
 
     return res;

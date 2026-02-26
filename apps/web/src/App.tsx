@@ -58,11 +58,20 @@ function AppContent() {
   const location = useLocation()
   const { user, isLoading } = useAuth()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
+  const transitionKey = location.pathname
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
+      </div>
+    )
+  }
 
   // Show welcome page for non-authenticated users
-  if (!isLoading && !user && !isAuthPage) {
+  if (!user && !isAuthPage) {
     return (
-      <div key={location.key} className="page-transition">
+      <div key={transitionKey} className="page-transition-subtle">
         <Routes>
           <Route path="/" element={<Welcome />} />
           <Route path="/login" element={<Login />} />
@@ -75,7 +84,7 @@ function AppContent() {
 
   if (isAuthPage) {
     return (
-      <div key={location.key} className="page-transition">
+      <div key={transitionKey} className="page-transition-subtle">
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
@@ -110,7 +119,7 @@ function AppContent() {
       </nav>
 
       {/* Main Content */}
-      <main key={location.key} className="max-w-7xl mx-auto px-6 py-8 page-transition">
+      <main key={transitionKey} className="max-w-7xl mx-auto px-6 py-8 page-transition-subtle">
         <Routes>
           <Route path="/" element={
             <ProtectedRoute>
