@@ -5,6 +5,14 @@ A self-hosted, local-first environment variable manager with UI + API + CLI. Sec
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D18-green.svg)
 
+## Project Status
+
+EnVault este in stadiu **production-ready candidate**:
+- lint / typecheck / test / build verificate
+- teste API + CLI + Web E2E trecute
+- Docker rebuild + health checks validate
+- GitHub OAuth integrat (cu callback configurabil)
+
 ## Features
 
 - **Projects & Environments**: Organize variables by project (e.g., "my-saas") and environment (local, staging, prod)
@@ -49,6 +57,12 @@ This starts:
 - API on http://localhost:3093
 - Web UI on http://localhost:3092
 
+### Default Ports
+
+- Web UI: `http://localhost:3092`
+- API: `http://localhost:3093`
+- PostgreSQL: `localhost:5432`
+
 ### Docker (Production)
 
 ```bash
@@ -63,6 +77,20 @@ docker-compose up -d
 Access:
 - Web UI: http://localhost:3092
 - API: http://localhost:3093
+
+### GitHub OAuth Configuration
+
+Seteaza in `.env`:
+
+```env
+GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_SECRET=your_client_secret
+APP_URL=http://localhost:3092
+GITHUB_CALLBACK_PATH=/auth/github/callback
+```
+
+In GitHub OAuth App:
+- Authorization callback URL: `http://localhost:3092/auth/github/callback`
 
 ## CLI Usage
 
@@ -225,6 +253,8 @@ CI (`.github/workflows/ci.yml`) runs lint + typecheck + tests, and the lint/type
 
 Production deploy is done from the main branch using Railway configuration in `railway.toml`.
 
+Before production release, use `docs/checklist.md` (Release readiness section) for final go-live checks.
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -237,6 +267,10 @@ Production deploy is done from the main branch using Railway configuration in `r
 | `HOST` | No | API host (default: 0.0.0.0) |
 | `LOG_LEVEL` | No | debug, info, warn, error (default: info) |
 | `CORS_ORIGIN` | No | CORS origin (default: true = any) |
+| `APP_URL` | No | Public app URL used for OAuth redirects (default: request host) |
+| `GITHUB_CLIENT_ID` | No | GitHub OAuth client id |
+| `GITHUB_CLIENT_SECRET` | No | GitHub OAuth client secret |
+| `GITHUB_CALLBACK_PATH` | No | GitHub callback path (default: `/auth/github/callback`) |
 
 ## License
 
