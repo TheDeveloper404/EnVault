@@ -34,9 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (token) {
+    const allowE2EBypass = import.meta.env.VITE_E2E_AUTH_BYPASS === '1';
+    if (token || allowE2EBypass) {
       fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined
       })
         .then(res => {
           if (res.ok) return res.json();

@@ -18,10 +18,11 @@ export default defineConfig({
     {
       command: 'pnpm --dir ../.. --filter @envault/api dev:e2e',
       url: 'http://127.0.0.1:3093/health',
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 120_000,
       env: {
         ENVAULT_MASTER_KEY: MASTER_KEY,
+        ENVAULT_E2E_AUTH_BYPASS: '1',
         DATABASE_URL: 'postgresql://envault:envault_dev_password@localhost:5432/envault_e2e',
         API_PORT: '3093',
         PORT: '3091',
@@ -31,11 +32,12 @@ export default defineConfig({
     {
       command: 'pnpm --dir ../.. --filter @envault/web dev',
       url: 'http://localhost:3092',
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 120_000,
       env: {
         VITE_API_PROXY_TARGET: 'http://127.0.0.1:3093',
-        VITE_PORT: '3092'
+        VITE_PORT: '3092',
+        VITE_E2E_AUTH_BYPASS: '1'
       }
     }
   ],

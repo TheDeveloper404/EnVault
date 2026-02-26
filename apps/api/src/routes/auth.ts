@@ -236,8 +236,9 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
 export async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
   const isTestEnv = process.env.NODE_ENV === 'test';
+  const isE2EBypass = process.env.ENVAULT_E2E_AUTH_BYPASS === '1';
 
-  if ((!authHeader || !authHeader.startsWith('Bearer ')) && isTestEnv) {
+  if ((!authHeader || !authHeader.startsWith('Bearer ')) && (isTestEnv || isE2EBypass)) {
     const testUser = await prisma.user.upsert({
       where: { email: 'integration-test@envault.local' },
       update: {},
