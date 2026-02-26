@@ -1,16 +1,37 @@
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { prisma } from './db.js';
 import { authRoutes } from './routes/auth.js';
+import { authenticate } from './routes/auth.js';
 import { environmentRoutes } from './routes/environments.js';
 import { projectRoutes } from './routes/projects.js';
 import { schemaRoutes } from './routes/schema.js';
 
 const startTime = Date.now();
+const INSECURE_JWT_DEFAULT = 'envault-dev-secret-change-in-production';
+const INSECURE_MASTER_KEY_DEFAULT = 'aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344';
 
 const ALLOWED_IPS = (process.env.ALLOWED_IPS || '').split(',').filter(Boolean);
 const IP_WHITELIST_ENABLED = process.env.IP_WHITELIST_ENABLED === 'true';
+
+function validateProductionSecurityConfig(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+
+  if (!process.env.CORS_ORIGIN) {
+    throw new Error('CORS_ORIGIN must be explicitly set in production');
+  }
+
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === INSECURE_JWT_DEFAULT) {
+    throw new Error('JWT_SECRET must be set to a strong value in production');
+  }
+
+  if (!process.env.ENVAULT_MASTER_KEY || process.env.ENVAULT_MASTER_KEY === INSECURE_MASTER_KEY_DEFAULT) {
+    throw new Error('ENVAULT_MASTER_KEY must be set to a non-default value in production');
+  }
+}
 
 async function ipWhitelistHook(request: { ip?: string }, reply: { status: (code: number) => { send: (data: { error: string }) => void } }) {
   if (!IP_WHITELIST_ENABLED || ALLOWED_IPS.length === 0) return;
@@ -20,6 +41,8 @@ async function ipWhitelistHook(request: { ip?: string }, reply: { status: (code:
 }
 
 export async function buildApp(): Promise<FastifyInstance> {
+  validateProductionSecurityConfig();
+
   const fastify = Fastify({
     logger: {
       level: process.env.LOG_LEVEL || 'info'
@@ -41,8 +64,14 @@ export async function buildApp(): Promise<FastifyInstance> {
     })
   });
 
+  await fastify.register(cookie);
+
+  await fastify.register(helmet, {
+    contentSecurityPolicy: false
+  });
+
   await fastify.register(cors, {
-    origin: process.env.CORS_ORIGIN || true,
+    origin: process.env.CORS_ORIGIN || false,
     credentials: true
   });
 
@@ -73,7 +102,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     return response;
   });
 
-  fastify.get('/metrics', async () => {
+  const metricsPreHandler = process.env.METRICS_PUBLIC === 'true' ? undefined : [authenticate];
+
+  fastify.get('/metrics', { preHandler: metricsPreHandler }, async () => {
     const uptime = Date.now() - startTime;
     
     return {

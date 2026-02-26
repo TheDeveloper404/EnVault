@@ -31,17 +31,18 @@ services:
       dockerfile: infra/docker/Dockerfile.api
     environment:
       - DATABASE_URL=postgresql://envault:${DB_PASSWORD:-envault_dev_password}@postgres:5432/envault
-      - ENVAULT_MASTER_KEY=${ENVAULT_MASTER_KEY:-aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344}
+      - ENVAULT_MASTER_KEY=${ENVAULT_MASTER_KEY}
       - NODE_ENV=production
       - API_PORT=3093
       - PORT=3091
       - LOG_LEVEL=info
       - RATE_LIMIT_MAX=100
       - RATE_LIMIT_WINDOW=60000
-      - JWT_SECRET=${JWT_SECRET:-envault-jwt-secret-change-in-production}
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=7d
       - IP_WHITELIST_ENABLED=false
       - ALLOWED_IPS=
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3092}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - APP_URL=${APP_URL:-http://localhost:3092}

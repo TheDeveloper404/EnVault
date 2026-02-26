@@ -51,7 +51,21 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ENVAULT_MASTER_KEY: aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344
-      DATABASE_URL: file:./test.db
+      DATABASE_URL: postgresql://envault:envault_test_password@localhost:5432/envault_test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: envault
+          POSTGRES_PASSWORD: envault_test_password
+          POSTGRES_DB: envault_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U envault"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2

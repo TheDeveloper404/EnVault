@@ -23,38 +23,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get('token');
-    
-    if (urlToken) {
-      localStorage.setItem('token', urlToken);
-      setToken(urlToken);
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
-
-  useEffect(() => {
     const allowE2EBypass = import.meta.env.VITE_E2E_AUTH_BYPASS === '1';
-    if (token || allowE2EBypass) {
-      fetch('/api/auth/me', {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+
+    fetch('/api/auth/me', {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    })
+      .then(res => {
+        if (res.ok) return res.json();
+        if (allowE2EBypass) {
+          return fetch('/api/auth/me').then(e2eRes => (e2eRes.ok ? e2eRes.json() : Promise.reject(new Error('Invalid session'))));
+        }
+        throw new Error('Invalid session');
       })
-        .then(res => {
-          if (res.ok) return res.json();
-          throw new Error('Invalid token');
-        })
-        .then(data => {
-          setUser(data.user);
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-          setToken(null);
-          setUser(null);
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
+      .then(data => {
+        setUser(data.user);
+      })
+      .catch(() => {
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
+      })
+      .finally(() => setIsLoading(false));
   }, [token]);
 
   const login = async (email: string, password: string) => {
@@ -70,8 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    localStorage.setItem('token', data.token);
-    setToken(data.token);
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+      setToken(data.token);
+    }
     setUser(data.user);
   };
 
@@ -88,12 +79,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    localStorage.setItem('token', data.token);
-    setToken(data.token);
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+      setToken(data.token);
+    }
     setUser(data.user);
   };
 
   const logout = () => {
+    void fetch('/api/auth/logout', { method: 'POST' });
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
