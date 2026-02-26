@@ -1,6 +1,6 @@
+import { Shield, Mail, Lock, User, AlertCircle, Github } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, Mail, Lock, User, AlertCircle, Github } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Signup() {

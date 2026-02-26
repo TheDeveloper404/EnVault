@@ -1,11 +1,11 @@
-import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom'
 import { Shield, LogOut, User } from 'lucide-react'
-import Projects from './pages/Projects'
-import Project from './pages/Project'
+import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
+import Project from './pages/Project'
+import Projects from './pages/Projects'
 import Signup from './pages/Signup'
 import Welcome from './pages/Welcome'
-import { AuthProvider, useAuth } from './context/AuthContext'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()

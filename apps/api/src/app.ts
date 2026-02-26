@@ -1,11 +1,11 @@
-import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import { projectRoutes } from './routes/projects.js';
-import { environmentRoutes } from './routes/environments.js';
-import { schemaRoutes } from './routes/schema.js';
-import { authRoutes } from './routes/auth.js';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { prisma } from './db.js';
+import { authRoutes } from './routes/auth.js';
+import { environmentRoutes } from './routes/environments.js';
+import { projectRoutes } from './routes/projects.js';
+import { schemaRoutes } from './routes/schema.js';
 
 const startTime = Date.now();
 

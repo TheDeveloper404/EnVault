@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
+import { useState } from 'react'
 
 interface DeleteConfirmModalProps {
   isOpen: boolean

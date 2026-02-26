@@ -1,5 +1,3 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
 import { 
   ArrowLeft, 
   Plus, 
@@ -15,6 +13,8 @@ import {
   Terminal,
   Trash2
 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useParams, Link } from 'react-router-dom'
 import DeleteConfirmModal from '../components/DeleteConfirmModal'
 
 interface Variable {

@@ -20,6 +20,14 @@ export const importEnvSchema = z.object({
   overwrite: z.boolean().optional().default(false)
 });
 
+export const restoreVariableSchema = z.object({
+  versionId: z.string().min(1).optional(),
+  restoreToDate: z.string().datetime().optional()
+}).refine((data) => data.versionId || data.restoreToDate, {
+  message: 'Either versionId or restoreToDate is required',
+  path: ['versionId']
+});
+
 export const setSchemaSchema = z.object({
   content: z.string() // JSON or .env.example format
 });
@@ -51,3 +59,4 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type CreateEnvironmentInput = z.infer<typeof createEnvironmentSchema>;
 export type UpsertVariableInput = z.infer<typeof upsertVariableSchema>;
 export type ImportEnvInput = z.infer<typeof importEnvSchema>;
+export type RestoreVariableInput = z.infer<typeof restoreVariableSchema>;

@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
 import { Shield, Key, Lock, Users, GitBranch, CheckCircle, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Welcome() {
   return (

@@ -1,0 +1,1 @@
+-- RBAC removed from scope. Migration intentionally left as no-op.

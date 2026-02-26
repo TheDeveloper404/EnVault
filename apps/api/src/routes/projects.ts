@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
+import { logAudit } from '../audit.js';
 import { prisma } from '../db.js';
 import { createProjectSchema } from '../schemas.js';
-import { logAudit } from '../audit.js';
 import { authenticate } from './auth.js';
 
 export async function projectRoutes(fastify: FastifyInstance): Promise<void> {

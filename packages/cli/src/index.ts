@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { Command } from 'commander';
 import { readFileSync, writeFileSync } from 'fs';
-import { apiFetch, apiFetchText } from './api.js';
 import { formatDiff } from '@envault/core';
+import type { DiffResult } from '@envault/core';
+import { Command } from 'commander';
+import { apiFetch, apiFetchText } from './api.js';
 
 const program = new Command();
 
@@ -200,17 +201,14 @@ program
         projectId = project.id;
       }
 
-      const result = await apiFetch(`/projects/${projectId}/diff?from=${from}&to=${to}`) as {
-        hasChanges: boolean;
-        entries: Array<{ key: string; type: string; sourceValue?: string; targetValue?: string }>;
-      };
+      const result = await apiFetch(`/projects/${projectId}/diff?from=${from}&to=${to}`) as DiffResult;
 
       if (!result.hasChanges) {
         console.log('No differences found');
         return;
       }
 
-      console.log(formatDiff(result as any, 'text'));
+      console.log(formatDiff(result, 'text'));
     } catch (error) {
       console.error('Error:', (error as Error).message);
       process.exit(1);

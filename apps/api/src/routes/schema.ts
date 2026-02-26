@@ -1,9 +1,9 @@
+import { parseEnvExample, parseSchemaJson, validateEnv, diffEnvs } from '@envault/core';
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../db.js';
-import { setSchemaSchema, validateQuerySchema, diffQuerySchema } from '../schemas.js';
 import { logAudit } from '../audit.js';
 import { decryptValue } from '../crypto.js';
-import { parseEnvExample, parseSchemaJson, validateEnv, diffEnvs } from '@envault/core';
+import { prisma } from '../db.js';
+import { setSchemaSchema, validateQuerySchema, diffQuerySchema } from '../schemas.js';
 
 export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /schema - Set schema

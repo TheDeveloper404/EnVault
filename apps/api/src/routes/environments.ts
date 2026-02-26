@@ -1,15 +1,35 @@
+import { parseEnv } from '@envault/core';
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../db.js';
-import { createEnvironmentSchema, upsertVariableSchema, importEnvSchema, exportQuerySchema } from '../schemas.js';
 import { logAudit } from '../audit.js';
 import { encryptValue, decryptValue, detectSecret } from '../crypto.js';
-import { parseEnv } from '@envault/core';
+import { prisma } from '../db.js';
+import { createEnvironmentSchema, upsertVariableSchema, importEnvSchema, exportQuerySchema, restoreVariableSchema } from '../schemas.js';
 import { authenticate } from './auth.js';
 
 export async function environmentRoutes(fastify: FastifyInstance): Promise<void> {
   
   // All routes require authentication
   fastify.addHook('preHandler', authenticate);
+
+  const createVersionSnapshot = async (
+    variableId: string | null,
+    environmentId: string,
+    key: string,
+    value: string,
+    isSecret: boolean,
+    operation: 'CREATE' | 'UPDATE' | 'DELETE' | 'IMPORT' | 'RESTORE'
+  ) => {
+    await prisma.envVariableVersion.create({
+      data: {
+        variableId: variableId ?? undefined,
+        environmentId,
+        key,
+        value,
+        isSecret,
+        operation
+      }
+    });
+  };
 
   // GET /projects/:id/environments - List environments
   fastify.get('/', async (request, reply) => {
@@ -126,6 +146,8 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
 
     let variable;
     if (existing) {
+      await createVersionSnapshot(existing.id, environment.id, existing.key, existing.value, existing.isSecret, 'UPDATE');
+
       variable = await prisma.envVariable.update({
         where: { id: existing.id },
         data: { value: encryptedValue, isSecret }
@@ -145,6 +167,7 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
           environmentId: environment.id
         }
       });
+      await createVersionSnapshot(variable.id, environment.id, variable.key, variable.value, variable.isSecret, 'CREATE');
       await logAudit('CREATE', 'VARIABLE', variable.id, projectId, { key: input.key, isSecret });
     }
 
@@ -183,6 +206,8 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
       isSecret: variable.isSecret
     });
 
+    await createVersionSnapshot(variable.id, environment.id, variable.key, variable.value, variable.isSecret, 'DELETE');
+
     await prisma.envVariable.delete({ where: { id: variable.id } });
 
     return reply.status(204).send();
@@ -218,13 +243,15 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
       }
 
       if (existing) {
+        await createVersionSnapshot(existing.id, environment.id, existing.key, existing.value, existing.isSecret, 'IMPORT');
+
         await prisma.envVariable.update({
           where: { id: existing.id },
           data: { value: encryptedValue, isSecret }
         });
         results.updated++;
       } else {
-        await prisma.envVariable.create({
+        const created = await prisma.envVariable.create({
           data: {
             key: entry.key,
             value: encryptedValue,
@@ -232,6 +259,7 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
             environmentId: environment.id
           }
         });
+        await createVersionSnapshot(created.id, environment.id, created.key, created.value, created.isSecret, 'IMPORT');
         results.imported++;
       }
     }
@@ -244,6 +272,108 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
     });
 
     return reply.status(200).send(results);
+  });
+
+  // GET /projects/:id/envs/:env/vars/:key/versions - List variable history
+  fastify.get('/:env/vars/:key/versions', async (request, reply) => {
+    const { id: projectId, env: envName, key } = request.params as { id: string; env: string; key: string };
+
+    const environment = await prisma.environment.findUnique({
+      where: { projectId_name: { projectId, name: envName } }
+    });
+
+    if (!environment) {
+      return reply.status(404).send({ error: 'Environment not found' });
+    }
+
+    const versions = await prisma.envVariableVersion.findMany({
+      where: { environmentId: environment.id, key },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!versions.length) {
+      return reply.status(404).send({ error: 'No version history found for variable' });
+    }
+
+    return versions.map((version) => ({
+      id: version.id,
+      operation: version.operation,
+      value: decryptValue(version.value),
+      isSecret: version.isSecret,
+      createdAt: version.createdAt.toISOString()
+    }));
+  });
+
+  // POST /projects/:id/envs/:env/vars/:key/restore - Restore variable from history
+  fastify.post('/:env/vars/:key/restore', async (request, reply) => {
+    const { id: projectId, env: envName, key } = request.params as { id: string; env: string; key: string };
+    const { versionId, restoreToDate } = restoreVariableSchema.parse(request.body);
+
+    const environment = await prisma.environment.findUnique({
+      where: { projectId_name: { projectId, name: envName } }
+    });
+
+    if (!environment) {
+      return reply.status(404).send({ error: 'Environment not found' });
+    }
+
+    const variable = await prisma.envVariable.findUnique({
+      where: { environmentId_key: { environmentId: environment.id, key } }
+    });
+
+    const targetVersion = versionId
+      ? await prisma.envVariableVersion.findFirst({
+          where: { id: versionId, environmentId: environment.id, key }
+        })
+      : await prisma.envVariableVersion.findFirst({
+          where: {
+            environmentId: environment.id,
+            key,
+            createdAt: { lte: new Date(restoreToDate!) }
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+
+    if (!targetVersion) {
+      return reply.status(404).send({ error: 'Version not found for restore target' });
+    }
+
+    if (variable) {
+      await createVersionSnapshot(variable.id, environment.id, variable.key, variable.value, variable.isSecret, 'RESTORE');
+    }
+
+    const restored = variable
+      ? await prisma.envVariable.update({
+          where: { id: variable.id },
+          data: {
+            value: targetVersion.value,
+            isSecret: targetVersion.isSecret
+          }
+        })
+      : await prisma.envVariable.create({
+          data: {
+            key,
+            value: targetVersion.value,
+            isSecret: targetVersion.isSecret,
+            environmentId: environment.id
+          }
+        });
+
+    await logAudit('UPDATE', 'VARIABLE', restored.id, projectId, {
+      key,
+      action: 'restore',
+      restoredFromVersionId: targetVersion.id,
+      restoredFromOperation: targetVersion.operation
+    });
+
+    return reply.status(200).send({
+      id: restored.id,
+      key: restored.key,
+      value: decryptValue(restored.value),
+      isSecret: restored.isSecret,
+      restoredFromVersionId: targetVersion.id,
+      restoredAt: restored.updatedAt.toISOString()
+    });
   });
 
   // GET /projects/:id/envs/:env/export - Export .env

@@ -50,10 +50,26 @@ model EnvVariable {
   isSecret      Boolean     @default(false)
   environmentId String
   environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  versions      EnvVariableVersion[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   @@unique([environmentId, key])
+}
+
+model EnvVariableVersion {
+  id            String      @id @default(uuid())
+  variableId    String?
+  variable      EnvVariable? @relation(fields: [variableId], references: [id], onDelete: SetNull)
+  environmentId String
+  key           String
+  value         String      // Encrypted value snapshot
+  isSecret      Boolean
+  operation     String      // CREATE, UPDATE, DELETE, IMPORT, RESTORE
+  createdAt     DateTime    @default(now())
+
+  @@index([environmentId, key, createdAt])
+  @@index([variableId, createdAt])
 }
 
 model Schema {
