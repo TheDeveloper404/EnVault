@@ -4,14 +4,23 @@ import { logAudit } from '../audit.js';
 import { decryptValue } from '../crypto.js';
 import { prisma } from '../db.js';
 import { setSchemaSchema, validateQuerySchema, diffQuerySchema } from '../schemas.js';
+import { authenticate } from './auth.js';
 
 export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.addHook('preHandler', authenticate);
+
+  const ensureProjectAccess = async (projectId: string, userId: string) => {
+    const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
+    return project;
+  };
+
   // POST /schema - Set schema
   fastify.post('/schema', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
+    const userId = request.user!.id;
     const { content } = setSchemaSchema.parse(request.body);
 
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    const project = await ensureProjectAccess(projectId, userId);
     if (!project) {
       return reply.status(404).send({ error: 'Project not found' });
     }
@@ -57,8 +66,9 @@ export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /schema - Get schema
   fastify.get('/schema', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
+    const userId = request.user!.id;
 
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    const project = await ensureProjectAccess(projectId, userId);
     if (!project) {
       return reply.status(404).send({ error: 'Project not found' });
     }
@@ -79,10 +89,11 @@ export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /validate - Validate environment against schema
   fastify.post('/validate', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
+    const userId = request.user!.id;
     const { env: envName } = validateQuerySchema.parse(request.query);
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId },
       include: { schema: true }
     });
 
@@ -123,9 +134,10 @@ export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /diff - Compare environments
   fastify.get('/diff', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
+    const userId = request.user!.id;
     const { from, to } = diffQuerySchema.parse(request.query);
 
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    const project = await ensureProjectAccess(projectId, userId);
     if (!project) {
       return reply.status(404).send({ error: 'Project not found' });
     }
@@ -173,8 +185,9 @@ export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /audit - Get audit logs
   fastify.get('/audit', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
+    const userId = request.user!.id;
 
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    const project = await ensureProjectAccess(projectId, userId);
     if (!project) {
       return reply.status(404).send({ error: 'Project not found' });
     }

@@ -31,11 +31,17 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
     });
   };
 
+  const ensureProjectAccess = async (projectId: string, userId: string) => {
+    const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
+    return project;
+  };
+
   // GET /projects/:id/environments - List environments
   fastify.get('/', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
+    const userId = request.user!.id;
 
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    const project = await ensureProjectAccess(projectId, userId);
     if (!project) {
       return reply.status(404).send({ error: 'Project not found' });
     }
@@ -66,9 +72,10 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
   // POST /projects/:id/environments - Create environment
   fastify.post('/', async (request, reply) => {
     const { id: projectId } = request.params as { id: string };
+    const userId = request.user!.id;
     const input = createEnvironmentSchema.parse(request.body);
 
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    const project = await ensureProjectAccess(projectId, userId);
     if (!project) {
       return reply.status(404).send({ error: 'Project not found' });
     }
@@ -97,6 +104,12 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
   // GET /projects/:id/envs/:env/vars - List variables (with decrypted values)
   fastify.get('/:env/vars', async (request, reply) => {
     const { id: projectId, env: envName } = request.params as { id: string; env: string };
+    const userId = request.user!.id;
+
+    const project = await ensureProjectAccess(projectId, userId);
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
 
     const environment = await prisma.environment.findUnique({
       where: { projectId_name: { projectId, name: envName } },
@@ -127,7 +140,13 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
   // PUT /projects/:id/envs/:env/vars/:key - Upsert variable
   fastify.put('/:env/vars/:key', async (request, reply) => {
     const { id: projectId, env: envName, key } = request.params as { id: string; env: string; key: string };
+    const userId = request.user!.id;
     const input = upsertVariableSchema.parse({ ...(request.body as object), key });
+
+    const project = await ensureProjectAccess(projectId, userId);
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
 
     const environment = await prisma.environment.findUnique({
       where: { projectId_name: { projectId, name: envName } }
@@ -184,6 +203,12 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
   // DELETE /projects/:id/envs/:env/vars/:key - Delete variable
   fastify.delete('/:env/vars/:key', async (request, reply) => {
     const { id: projectId, env: envName, key } = request.params as { id: string; env: string; key: string };
+    const userId = request.user!.id;
+
+    const project = await ensureProjectAccess(projectId, userId);
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
 
     const environment = await prisma.environment.findUnique({
       where: { projectId_name: { projectId, name: envName } }
@@ -216,7 +241,13 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
   // POST /projects/:id/envs/:env/import - Import .env
   fastify.post('/:env/import', async (request, reply) => {
     const { id: projectId, env: envName } = request.params as { id: string; env: string };
+    const userId = request.user!.id;
     const { content, overwrite } = importEnvSchema.parse(request.body);
+
+    const project = await ensureProjectAccess(projectId, userId);
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
 
     const environment = await prisma.environment.findUnique({
       where: { projectId_name: { projectId, name: envName } }
@@ -277,6 +308,12 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
   // GET /projects/:id/envs/:env/vars/:key/versions - List variable history
   fastify.get('/:env/vars/:key/versions', async (request, reply) => {
     const { id: projectId, env: envName, key } = request.params as { id: string; env: string; key: string };
+    const userId = request.user!.id;
+
+    const project = await ensureProjectAccess(projectId, userId);
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
 
     const environment = await prisma.environment.findUnique({
       where: { projectId_name: { projectId, name: envName } }
@@ -295,7 +332,7 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
       return reply.status(404).send({ error: 'No version history found for variable' });
     }
 
-    return versions.map((version) => ({
+    return versions.map((version: { id: string; operation: string; value: string; isSecret: boolean; createdAt: Date }) => ({
       id: version.id,
       operation: version.operation,
       value: decryptValue(version.value),
@@ -307,7 +344,13 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
   // POST /projects/:id/envs/:env/vars/:key/restore - Restore variable from history
   fastify.post('/:env/vars/:key/restore', async (request, reply) => {
     const { id: projectId, env: envName, key } = request.params as { id: string; env: string; key: string };
+    const userId = request.user!.id;
     const { versionId, restoreToDate } = restoreVariableSchema.parse(request.body);
+
+    const project = await ensureProjectAccess(projectId, userId);
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
 
     const environment = await prisma.environment.findUnique({
       where: { projectId_name: { projectId, name: envName } }
@@ -379,7 +422,13 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
   // GET /projects/:id/envs/:env/export - Export .env
   fastify.get('/:env/export', async (request, reply) => {
     const { id: projectId, env: envName } = request.params as { id: string; env: string };
+    const userId = request.user!.id;
     const { includeEmpty, mask } = exportQuerySchema.parse(request.query);
+
+    const project = await ensureProjectAccess(projectId, userId);
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
 
     const environment = await prisma.environment.findUnique({
       where: { projectId_name: { projectId, name: envName } },
@@ -407,6 +456,12 @@ export async function environmentRoutes(fastify: FastifyInstance): Promise<void>
   // DELETE /projects/:id/environments/:envName - Delete environment
   fastify.delete('/:envName', async (request, reply) => {
     const { id: projectId, envName } = request.params as { id: string; envName: string };
+    const userId = request.user!.id;
+
+    const project = await ensureProjectAccess(projectId, userId);
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
 
     const environment = await prisma.environment.findUnique({
       where: { projectId_name: { projectId, name: envName } }

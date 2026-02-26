@@ -170,10 +170,12 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
 
       const tokenData = await tokenRes.json() as { access_token?: string; error?: string; error_description?: string };
       
-      console.log('GitHub token response:', tokenData);
-      
       if (!tokenRes.ok || !tokenData.access_token) {
-        console.error('GitHub token failed:', tokenData);
+        console.error('GitHub token exchange failed', {
+          status: tokenRes.status,
+          error: tokenData.error,
+          errorDescription: tokenData.error_description
+        });
         return reply.redirect(`${appUrl}/login?error=github_token_failed&reason=${encodeURIComponent(tokenData.error || 'unknown')}&description=${encodeURIComponent(tokenData.error_description || '')}`);
       }
 
@@ -236,7 +238,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
 export async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
   const isTestEnv = process.env.NODE_ENV === 'test';
-  const isE2EBypass = process.env.ENVAULT_E2E_AUTH_BYPASS === '1';
+  const isE2EBypass = process.env.NODE_ENV !== 'production' && process.env.ENVAULT_E2E_AUTH_BYPASS === '1';
 
   if ((!authHeader || !authHeader.startsWith('Bearer ')) && (isTestEnv || isE2EBypass)) {
     const testUser = await prisma.user.upsert({
