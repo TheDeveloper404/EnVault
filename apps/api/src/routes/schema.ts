@@ -48,12 +48,12 @@ export async function schemaRoutes(fastify: FastifyInstance): Promise<void> {
         where: { id: existing.id },
         data: { content: schemaContent }
       });
-      await logAudit('UPDATE', 'SCHEMA', schema.id, projectId);
+      await logAudit('UPDATE', 'SCHEMA', schema.id, projectId, request.user!.email);
     } else {
       schema = await prisma.schema.create({
         data: { content: schemaContent, projectId }
       });
-      await logAudit('CREATE', 'SCHEMA', schema.id, projectId);
+      await logAudit('CREATE', 'SCHEMA', schema.id, projectId, request.user!.email);
     }
 
     return reply.status(existing ? 200 : 201).send({

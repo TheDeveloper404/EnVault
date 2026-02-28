@@ -45,7 +45,7 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
       - run: pnpm install
-      - run: pnpm test:unit
+      - run: pnpm test:coverage
 
   test-integration:
     runs-on: ubuntu-latest

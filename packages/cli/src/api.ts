@@ -1,7 +1,7 @@
 const DEFAULT_API_URL = 'http://localhost:3093';
 
 export function getApiUrl(): string {
-  return process.env.ENVALT_API_URL || DEFAULT_API_URL;
+  return process.env.ENVAULT_API_URL || process.env.ENVALT_API_URL || DEFAULT_API_URL;
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<unknown> {

@@ -33,6 +33,14 @@ model Session {
   @@index([expiresAt])
 }
 
+model LoginThrottle {
+  key            String   @id
+  count          Int      @default(0)
+  windowStartMs  BigInt
+  blockedUntilMs BigInt?
+  updatedAt      DateTime @updatedAt
+}
+
 model Project {
   id          String        @id @default(uuid())
   name        String        @unique

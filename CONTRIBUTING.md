@@ -6,7 +6,7 @@ Thank you for your interest in contributing to EnVault! This document provides g
 
 1. Fork and clone the repository
 2. Install dependencies: `pnpm install`
-3. Set up environment: `cp .env.example .env` and configure `ENVALT_MASTER_KEY`
+3. Set up environment: `cp .env.example .env` and configure `ENVAULT_MASTER_KEY`
 4. Run migrations: `pnpm db:migrate`
 5. Start dev servers: `pnpm dev`
 
@@ -14,7 +14,7 @@ Thank you for your interest in contributing to EnVault! This document provides g
 
 - `packages/core/` - Core utilities (parser, crypto, validator, diff)
 - `packages/cli/` - Command-line interface
-- `apps/api/` - Fastify REST API with Prisma/SQLite
+- `apps/api/` - Fastify REST API with Prisma/PostgreSQL
 - `apps/web/` - React + Vite + Tailwind UI
 - `infra/docker/` - Docker configurations
 
@@ -38,8 +38,9 @@ Thank you for your interest in contributing to EnVault! This document provides g
 ## Testing
 
 - **Unit tests**: `pnpm --filter @envault/core test`
-- **Integration tests**: `pnpm --filter @envault/api test:integration`
-- **E2E tests**: `pnpm --filter @envault/web test:e2e`
+- **Unit coverage**: `pnpm test:coverage`
+- **Integration tests**: `pnpm test:integration`
+- **E2E tests**: `pnpm test:e2e`
 
 ## Security
 

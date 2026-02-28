@@ -13,6 +13,30 @@ import { schemaRoutes } from './routes/schema.js';
 const startTime = Date.now();
 const INSECURE_JWT_DEFAULT = 'envault-dev-secret-change-in-production';
 const INSECURE_MASTER_KEY_DEFAULT = 'aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344';
+const LATENCY_BUCKETS_MS = [50, 100, 250, 500, 1000, 2500, 5000] as const;
+
+const requestMetrics = {
+  total: 0,
+  error5xx: 0,
+  totalDurationMs: 0,
+  byMethod: {} as Record<string, number>,
+  byStatusClass: {} as Record<string, number>,
+  latencyBuckets: Object.fromEntries([
+    ...LATENCY_BUCKETS_MS.map((bucket) => [`le_${bucket}ms`, 0]),
+    ['gt_5000ms', 0]
+  ]) as Record<string, number>
+};
+
+function recordLatency(durationMs: number): void {
+  for (const bucket of LATENCY_BUCKETS_MS) {
+    if (durationMs <= bucket) {
+      requestMetrics.latencyBuckets[`le_${bucket}ms`] += 1;
+      return;
+    }
+  }
+
+  requestMetrics.latencyBuckets.gt_5000ms += 1;
+}
 
 const ALLOWED_IPS = (process.env.ALLOWED_IPS || '').split(',').filter(Boolean);
 const IP_WHITELIST_ENABLED = process.env.IP_WHITELIST_ENABLED === 'true';
@@ -52,6 +76,38 @@ export async function buildApp(): Promise<FastifyInstance> {
   if (IP_WHITELIST_ENABLED) {
     fastify.addHook('preHandler', ipWhitelistHook);
   }
+
+  fastify.addHook('onRequest', async (request, reply) => {
+    const timedRequest = request as typeof request & { startTimeMs?: number };
+    timedRequest.startTimeMs = performance.now();
+    reply.header('x-request-id', request.id);
+  });
+
+  fastify.addHook('onResponse', async (request, reply) => {
+    const timedRequest = request as typeof request & { startTimeMs?: number };
+    const durationMs = Math.max(0, performance.now() - (timedRequest.startTimeMs ?? performance.now()));
+    const statusCode = reply.statusCode;
+    const statusClass = `${Math.floor(statusCode / 100)}xx`;
+
+    requestMetrics.total += 1;
+    requestMetrics.totalDurationMs += durationMs;
+    requestMetrics.byMethod[request.method] = (requestMetrics.byMethod[request.method] || 0) + 1;
+    requestMetrics.byStatusClass[statusClass] = (requestMetrics.byStatusClass[statusClass] || 0) + 1;
+
+    if (statusCode >= 500) {
+      requestMetrics.error5xx += 1;
+    }
+
+    recordLatency(durationMs);
+
+    fastify.log.debug({
+      requestId: request.id,
+      method: request.method,
+      url: request.url,
+      statusCode,
+      durationMs: Number(durationMs.toFixed(2))
+    }, 'Request completed');
+  });
 
   await fastify.register(rateLimit, {
     max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
@@ -106,12 +162,24 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   fastify.get('/metrics', { preHandler: metricsPreHandler }, async () => {
     const uptime = Date.now() - startTime;
+    const totalRequests = requestMetrics.total;
+    const avgDurationMs = totalRequests > 0
+      ? Number((requestMetrics.totalDurationMs / totalRequests).toFixed(2))
+      : 0;
     
     return {
       uptime_seconds: Math.floor(uptime / 1000),
       memory_usage: process.memoryUsage(),
       cpu_usage: process.cpuUsage(),
-      node_version: process.version
+      node_version: process.version,
+      http_requests: {
+        total: totalRequests,
+        error_5xx: requestMetrics.error5xx,
+        average_duration_ms: avgDurationMs,
+        by_method: requestMetrics.byMethod,
+        by_status_class: requestMetrics.byStatusClass,
+        latency_buckets: requestMetrics.latencyBuckets
+      }
     };
   });
 

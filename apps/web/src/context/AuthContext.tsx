@@ -8,7 +8,6 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
@@ -19,46 +18,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const allowE2EBypass = import.meta.env.VITE_E2E_AUTH_BYPASS === '1';
     let isActive = true;
 
     const bootstrapSession = async () => {
       try {
         const res = await fetch('/api/auth/me');
 
-        if (!res.ok) {
-          if (token) {
-            const tokenRes = await fetch('/api/auth/me', {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (tokenRes.ok) {
-              const tokenData = await tokenRes.json() as { user: User };
-              if (isActive) setUser(tokenData.user);
-              return;
-            }
-          }
-
-          if (allowE2EBypass) {
-            const e2eRes = await fetch('/api/auth/me');
-            if (!e2eRes.ok) throw new Error('Invalid session');
-            const e2eData = await e2eRes.json() as { user: User };
-            if (isActive) setUser(e2eData.user);
-            return;
-          }
-          throw new Error('Invalid session');
-        }
+        if (!res.ok) throw new Error('Invalid session');
 
         const data = await res.json() as { user: User };
         if (isActive) setUser(data.user);
       } catch {
         if (isActive) {
-          localStorage.removeItem('token');
-          setToken(null);
           setUser(null);
         }
       } finally {
@@ -71,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       isActive = false;
     };
-  }, [token]);
+  }, []);
 
   const login = async (email: string, password: string) => {
     const res = await fetch('/api/auth/login', {
@@ -86,10 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    if (data.token) {
-      localStorage.setItem('token', data.token);
-      setToken(data.token);
-    }
     setUser(data.user);
   };
 
@@ -106,22 +76,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    if (data.token) {
-      localStorage.setItem('token', data.token);
-      setToken(data.token);
-    }
     setUser(data.user);
   };
 
   const logout = () => {
     void fetch('/api/auth/logout', { method: 'POST' });
-    localStorage.removeItem('token');
-    setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
@@ -149,11 +113,7 @@ export function useApi() {
         throw new Error('Session expired');
       }
 
-      const refreshData = await refreshRes.json() as { token?: string; user?: { id: string; email: string; name: string | null } };
-
-      if (refreshData.token) {
-        localStorage.setItem('token', refreshData.token);
-      }
+      await refreshRes.json() as { user?: { id: string; email: string; name: string | null } };
 
       const retryRes = await fetch(url, options);
 

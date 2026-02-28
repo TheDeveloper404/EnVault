@@ -3,10 +3,10 @@ FROM node:20-alpine AS envault_web_builder
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@8 --activate
 
-COPY pnpm-workspace.yaml package.json tsconfig.json ./
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.json ./
 COPY apps/web ./apps/web
 
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter @envault/web...
 RUN pnpm --filter @envault/web build
 
 # Production stage with nginx

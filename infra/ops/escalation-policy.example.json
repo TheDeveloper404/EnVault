@@ -1,0 +1,31 @@
+{
+  "service": "envault-api",
+  "routes": {
+    "SEV-1": {
+      "notify": [
+        "https://hooks.slack.com/services/PRIMARY-CHANNEL",
+        "https://hooks.slack.com/services/ONCALL-PAGER"
+      ],
+      "escalateAfterMinutes": 10,
+      "escalateTo": [
+        "https://hooks.slack.com/services/LEADERSHIP-CHANNEL"
+      ]
+    },
+    "SEV-2": {
+      "notify": [
+        "https://hooks.slack.com/services/PRIMARY-CHANNEL"
+      ],
+      "escalateAfterMinutes": 20,
+      "escalateTo": [
+        "https://hooks.slack.com/services/ONCALL-PAGER"
+      ]
+    },
+    "SEV-3": {
+      "notify": [
+        "https://hooks.slack.com/services/PRIMARY-CHANNEL"
+      ],
+      "escalateAfterMinutes": 0,
+      "escalateTo": []
+    }
+  }
+}

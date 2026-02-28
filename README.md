@@ -30,7 +30,7 @@ EnVault este in stadiu **production-ready candidate**:
 
 - Node.js 18+
 - pnpm 8+
-- SQLite (included)
+- PostgreSQL 16+
 
 ### Development Setup
 
@@ -43,8 +43,8 @@ cd envault
 pnpm install
 
 # Set master key (required for encryption)
-export ENVALT_MASTER_KEY=$(pnpm --filter @envault/cli exec envault key generate)
-echo "Save this key: $ENVALT_MASTER_KEY"
+export ENVAULT_MASTER_KEY=$(pnpm --filter @envault/cli exec envault key generate)
+echo "Save this key: $ENVAULT_MASTER_KEY"
 
 # Run migrations
 pnpm db:migrate
@@ -67,7 +67,7 @@ This starts:
 
 ```bash
 # Set master key
-export ENVALT_MASTER_KEY=your-64-char-hex-key
+export ENVAULT_MASTER_KEY=your-64-char-hex-key
 
 # Run with docker-compose
 cd infra/docker
@@ -139,7 +139,7 @@ envault schema --file .env.example
 ### Encryption
 
 - Algorithm: AES-256-GCM
-- Master Key: Must be set via `ENVALT_MASTER_KEY` environment variable
+- Master Key: Must be set via `ENVAULT_MASTER_KEY` environment variable
 - Format: `base64(nonce:12bytes + auth_tag:16bytes + ciphertext)`
 - Key Validation: Accepts 64-char hex, base64, or derives from passphrase via scrypt
 
@@ -206,7 +206,7 @@ DEBUG=false
 ```
 EnVault/
 ├── apps/
-│   ├── api/          # Fastify + Prisma + SQLite
+│   ├── api/          # Fastify + Prisma + PostgreSQL
 │   └── web/          # React + Vite + Tailwind
 ├── packages/
 │   ├── core/         # Parser, crypto, validator, diff
@@ -224,14 +224,17 @@ EnVault/
 # Run all tests
 pnpm test
 
-# Unit tests (packages/core)
-pnpm --filter @envault/core test
+# Unit tests
+pnpm test:unit
+
+# Coverage (unit coverage gate)
+pnpm test:coverage
 
 # Integration tests (apps/api)
-pnpm --filter @envault/api test:integration
+pnpm test:integration
 
 # E2E tests (apps/web)
-pnpm --filter @envault/web test:e2e
+pnpm test:e2e
 ```
 
 ## Release Workflow (main -> production)
@@ -249,28 +252,37 @@ pnpm build
 pnpm test
 ```
 
-CI (`.github/workflows/ci.yml`) runs lint + typecheck + tests, and the lint/typecheck job builds `@envault/core` before workspace typecheck so `@envault/cli` can resolve `@envault/core` types reliably in clean runners.
+CI (`.github/workflows/ci.yml`) runs lint + typecheck + unit coverage gate + integration tests + build + e2e.
 
-Production deploy is done from the main branch using Railway configuration in `railway.toml`.
+Deployment guidance (including free-hosting options) is documented in `docs/deployment-options.md`.
 
 Before production release, use `docs/checklist.md` (Release readiness section) for final go-live checks.
+
+For PostgreSQL backup and restore operations, use `docs/backup-restore.md`.
+
+For centralized logs + external alerting baseline, use `docs/log-aggregation.md` and `docs/alerting-baseline.md`.
+
+For managed retention/compliance baseline (Grafana Cloud templates), use `docs/retention-compliance.md`.
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ENVALT_MASTER_KEY` | Yes | 64-char hex or base64 key for encryption |
-| `DATABASE_URL` | No | SQLite path (default: `file:./envault.db`) |
+| `ENVAULT_MASTER_KEY` | Yes | 64-char hex or base64 key for encryption |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `PORT` | No | Backend/API service port (default: 3091) |
 | `API_PORT` | No | Public API listener port (default: 3093) |
 | `VITE_PORT` | No | Web UI dev server port (default: 3092) |
 | `HOST` | No | API host (default: 0.0.0.0) |
 | `LOG_LEVEL` | No | debug, info, warn, error (default: info) |
-| `CORS_ORIGIN` | No | CORS origin (default: true = any) |
+| `CORS_ORIGIN` | Yes in production | Allowed origin for CORS (defaults to disabled when unset) |
 | `APP_URL` | No | Public app URL used for OAuth redirects (default: request host) |
 | `GITHUB_CLIENT_ID` | No | GitHub OAuth client id |
 | `GITHUB_CLIENT_SECRET` | No | GitHub OAuth client secret |
 | `GITHUB_CALLBACK_PATH` | No | GitHub callback path (default: `/auth/github/callback`) |
+| `AUTH_MAX_LOGIN_ATTEMPTS` | No | Failed logins before temporary block (default: 5) |
+| `AUTH_LOGIN_ATTEMPT_WINDOW_MS` | No | Failed-login counting window in ms (default: 900000) |
+| `AUTH_LOGIN_BLOCK_DURATION_MS` | No | Temporary block duration in ms (default: 900000) |
 
 ## License
 

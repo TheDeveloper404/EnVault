@@ -10,6 +10,11 @@ const REFRESH_TOKEN_EXPIRES_DAYS = parseInt(process.env.REFRESH_TOKEN_EXPIRES_DA
 const AUTH_COOKIE_NAME = 'envault_session';
 const REFRESH_COOKIE_NAME = 'envault_refresh';
 const OAUTH_STATE_COOKIE_NAME = 'envault_oauth_state';
+const MAX_LOGIN_ATTEMPTS = parseInt(process.env.AUTH_MAX_LOGIN_ATTEMPTS || '5', 10);
+const LOGIN_ATTEMPT_WINDOW_MS = parseInt(process.env.AUTH_LOGIN_ATTEMPT_WINDOW_MS || '900000', 10);
+const LOGIN_BLOCK_DURATION_MS = parseInt(process.env.AUTH_LOGIN_BLOCK_DURATION_MS || '900000', 10);
+
+type LoginAttemptState = { count: number; windowStartMs: number; blockedUntilMs?: number };
 
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is required');
@@ -29,6 +34,97 @@ declare module 'fastify' {
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   const isProduction = process.env.NODE_ENV === 'production';
+
+  const getLoginAttemptKey = (request: FastifyRequest, email: string): string => {
+    const ip = request.ip || 'unknown-ip';
+    return `${ip}:${email.toLowerCase()}`;
+  };
+
+  const getLoginAttemptState = async (key: string, nowMs: number): Promise<LoginAttemptState> => {
+    const current = await prisma.loginThrottle.findUnique({ where: { key } });
+
+    if (!current) {
+      await prisma.loginThrottle.create({
+        data: {
+          key,
+          count: 0,
+          windowStartMs: BigInt(nowMs)
+        }
+      });
+
+      return { count: 0, windowStartMs: nowMs };
+    }
+
+    const currentWindowStartMs = Number(current.windowStartMs);
+    const currentBlockedUntilMs = current.blockedUntilMs === null ? undefined : Number(current.blockedUntilMs);
+
+    if (currentWindowStartMs + LOGIN_ATTEMPT_WINDOW_MS <= nowMs) {
+      await prisma.loginThrottle.update({
+        where: { key },
+        data: {
+          count: 0,
+          windowStartMs: BigInt(nowMs),
+          blockedUntilMs: null
+        }
+      });
+
+      return { count: 0, windowStartMs: nowMs };
+    }
+
+    return {
+      count: current.count,
+      windowStartMs: currentWindowStartMs,
+      blockedUntilMs: currentBlockedUntilMs
+    };
+  };
+
+  const registerLoginFailure = async (key: string): Promise<void> => {
+    const nowMs = Date.now();
+    const state = await getLoginAttemptState(key, nowMs);
+    const nextCount = state.count + 1;
+    const blockedUntilMs = nextCount >= MAX_LOGIN_ATTEMPTS
+      ? nowMs + LOGIN_BLOCK_DURATION_MS
+      : state.blockedUntilMs;
+
+    await prisma.loginThrottle.upsert({
+      where: { key },
+      create: {
+        key,
+        count: nextCount,
+        windowStartMs: BigInt(state.windowStartMs),
+        blockedUntilMs: blockedUntilMs === undefined ? null : BigInt(blockedUntilMs)
+      },
+      update: {
+        count: nextCount,
+        windowStartMs: BigInt(state.windowStartMs),
+        blockedUntilMs: blockedUntilMs === undefined ? null : BigInt(blockedUntilMs)
+      }
+    });
+  };
+
+  const clearLoginFailures = async (key: string): Promise<void> => {
+    await prisma.loginThrottle.deleteMany({ where: { key } });
+  };
+
+  const validatePasswordStrength = (password: string): string | null => {
+    if (password.length < 10) {
+      return 'Password must be at least 10 characters long';
+    }
+    if (!/[a-z]/.test(password)) {
+      return 'Password must include at least one lowercase letter';
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'Password must include at least one uppercase letter';
+    }
+    if (!/[0-9]/.test(password)) {
+      return 'Password must include at least one number';
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      return 'Password must include at least one special character';
+    }
+
+    return null;
+  };
 
   const createAccessToken = (user: { id: string; email: string }) => jwt.sign(
     { id: user.id, email: user.email },
@@ -99,8 +195,9 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'Email and password are required' });
     }
 
-    if (password.length < 6) {
-      return reply.status(400).send({ error: 'Password must be at least 6 characters' });
+    const passwordValidationError = validatePasswordStrength(password);
+    if (passwordValidationError) {
+      return reply.status(400).send({ error: passwordValidationError });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -128,8 +225,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         id: user.id,
         email: user.email,
         name: user.name
-      },
-      token
+      }
     });
   });
 
@@ -141,15 +237,27 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'Email and password are required' });
     }
 
+    const loginAttemptKey = getLoginAttemptKey(request, email);
+    const nowMs = Date.now();
+    const attemptState = await getLoginAttemptState(loginAttemptKey, nowMs);
+
+    if (attemptState.blockedUntilMs && attemptState.blockedUntilMs > nowMs) {
+      return reply.status(429).send({ error: 'Too many login attempts. Please try again later.' });
+    }
+
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
+      await registerLoginFailure(loginAttemptKey);
       return reply.status(401).send({ error: 'Invalid email or password' });
     }
 
     const validPassword = await bcrypt.compare(password, user.passwordHash);
     if (!validPassword) {
+      await registerLoginFailure(loginAttemptKey);
       return reply.status(401).send({ error: 'Invalid email or password' });
     }
+
+    await clearLoginFailures(loginAttemptKey);
 
     const token = createAccessToken(user);
 
@@ -161,8 +269,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         id: user.id,
         email: user.email,
         name: user.name
-      },
-      token
+      }
     };
   });
 
@@ -239,8 +346,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         id: session.user.id,
         email: session.user.email,
         name: session.user.name
-      },
-      token
+      }
     };
   });
 

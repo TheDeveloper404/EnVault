@@ -9,6 +9,7 @@
     "start": "cd apps/api && npx prisma migrate deploy && node dist/index.js",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
+    "test:coverage": "vitest run tests/unit --coverage",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test --config apps/web/playwright.config.ts",
     "lint": "eslint . --ext .ts,.tsx",
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",
+    "@vitest/coverage-v8": "^1.0.0",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",

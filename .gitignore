@@ -16,11 +16,16 @@ build/
 *.db
 *.db-journal
 
-# Logs
+# Logs 
 logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Operational artifacts
+infra/backups/
+infra/ops/*.local.json
+infra/ops/*.local.env
 
 # IDE
 .vscode/
@@ -37,6 +42,9 @@ coverage/
 .nyc_output/
 tests/
 
+# Local docs (temporary)
+docs/
+
 # Prisma
 prisma/migrations/*/migration_lock.toml
 
@@ -45,7 +53,3 @@ prisma/migrations/*/migration_lock.toml
 .cache/
 temp/
 tmp/
-
-# Local docs (temporary)
-docs/
-

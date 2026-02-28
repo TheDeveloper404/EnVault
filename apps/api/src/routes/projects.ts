@@ -50,7 +50,7 @@ export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
       }
     });
 
-    await logAudit('CREATE', 'PROJECT', project.id, project.id);
+    await logAudit('CREATE', 'PROJECT', project.id, project.id, request.user!.email);
 
     return reply.status(201).send({
       id: project.id,
@@ -117,7 +117,7 @@ export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
       data: { name }
     });
 
-    await logAudit('UPDATE', 'PROJECT', id, id, { oldName: project.name, newName: name });
+    await logAudit('UPDATE', 'PROJECT', id, id, request.user!.email, { oldName: project.name, newName: name });
 
     return {
       id: updated.id,
@@ -138,7 +138,7 @@ export async function projectRoutes(fastify: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'Project not found' });
     }
 
-    await logAudit('DELETE', 'PROJECT', id, id);
+    await logAudit('DELETE', 'PROJECT', id, id, request.user!.email);
     await prisma.project.delete({ where: { id } });
 
     return reply.status(204).send();
